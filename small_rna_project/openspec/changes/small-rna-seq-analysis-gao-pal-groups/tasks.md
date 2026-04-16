@@ -16,8 +16,8 @@
 
 ## 3. 序列比对模块
 
-- [ ] 3.1 构建Bowtie2参考基因组索引 `scripts/alignment/build_bowtie2_index.py`
-- [ ] 3.2 编写Bowtie2比对脚本 `scripts/alignment/run_bowtie2.py`，支持small RNA短序列参数优化
+- [x] 3.1 构建Bowtie2参考基因组索引 `scripts/alignment/build_bowtie2_index.py`
+- [x] 3.2 编写Bowtie2比对脚本 `scripts/alignment/run_bowtie2.py`，支持small RNA短序列参数优化
 - [ ] 3.3 实现SAM到BAM格式转换和排序功能
 - [ ] 3.4 编写比对统计脚本，计算每个样本的比对率、唯一比对率
 - [ ] 3.5 创建比对质量评估脚本，生成比对质量分布图和基因组覆盖度分析
