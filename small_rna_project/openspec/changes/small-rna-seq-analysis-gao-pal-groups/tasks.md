@@ -8,10 +8,10 @@
 
 ## 2. 数据质量控制模块
 
-- [ ] 2.1 编写FastQC分析脚本 `scripts/qc/fastqc_analysis.py`
-- [ ] 2.2 编写Trimmomatic质量修剪脚本 `scripts/qc/trim_fastq.py`
-- [ ] 2.3 实现质控结果汇总功能，生成所有样本的质量控制报告
-- [ ] 2.4 创建质控可视化脚本，生成reads数条形图、质量分布热图等图表
+- [x] 2.1 编写FastQC分析脚本 `scripts/qc/fastqc_analysis.py`
+- [x] 2.2 编写Trimmomatic质量修剪脚本 `scripts/qc/trim_fastq.py`
+- [x] 2.3 实现质控结果汇总功能，生成所有样本的质量控制报告
+- [x] 2.4 创建质控可视化脚本，生成reads数条形图、质量分布热图等图表
 - [ ] 2.5 测试数据质控模块，确保正确处理原始fastq文件
 
 ## 3. 序列比对模块
