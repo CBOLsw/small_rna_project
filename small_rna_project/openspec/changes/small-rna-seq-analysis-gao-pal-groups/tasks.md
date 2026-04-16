@@ -1,10 +1,10 @@
 ## 1. 项目设置和环境配置
 
-- [ ] 1.1 创建conda环境配置文件 `envs/small_rna_analysis.yaml`
-- [ ] 1.2 安装所有必要的生物信息学工具（FastQC、Trimmomatic、Bowtie2、samtools、featureCounts、DESeq2、MEME Suite等）
-- [ ] 1.3 设置项目目录结构，确保data、scripts、results等目录正确创建
-- [ ] 1.4 准备参考基因组数据，下载hg38参考基因组和基因注释文件到 `references/` 目录
-- [ ] 1.5 创建样本信息文件 `data/metadata/sample_info.csv`，记录样本名称、组别、重复、fastq文件路径
+- [x] 1.1 创建conda环境配置文件 `envs/small_rna_analysis.yaml`
+- [x] 1.2 安装所有必要的生物信息学工具（FastQC、Trimmomatic、Bowtie2、samtools、featureCounts、DESeq2、MEME Suite等）
+- [x] 1.3 设置项目目录结构，确保data、scripts、results等目录正确创建
+- [x] 1.4 准备参考基因组数据，下载hg38参考基因组和基因注释文件到 `references/` 目录
+- [x] 1.5 创建样本信息文件 `data/metadata/sample_info.csv`，记录样本名称、组别、重复、fastq文件路径
 
 ## 2. 数据质量控制模块
 
