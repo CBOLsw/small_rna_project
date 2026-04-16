@@ -103,7 +103,11 @@ class Bowtie2Aligner:
 
         if success:
             # 转换SAM到BAM并排序
-            bam_success = self._sam_to_bam(str(sam_file), str(sorted_bam), sample_name)
+            threads = config.get('threads', 4)
+            bam_success = self._sam_to_bam(
+                str(sam_file), str(sorted_bam), sample_name,
+                threads=threads, keep_sam=config.get('keep_sam', False)
+            )
             if bam_success:
                 # 索引BAM文件
                 self._index_bam(str(sorted_bam), sample_name)
@@ -175,7 +179,11 @@ class Bowtie2Aligner:
 
         if success:
             # 转换SAM到BAM并排序
-            bam_success = self._sam_to_bam(str(sam_file), str(sorted_bam), sample_name)
+            threads = config.get('threads', 4)
+            bam_success = self._sam_to_bam(
+                str(sam_file), str(sorted_bam), sample_name,
+                threads=threads, keep_sam=config.get('keep_sam', False)
+            )
             if bam_success:
                 # 索引BAM文件
                 self._index_bam(str(sorted_bam), sample_name)
@@ -333,8 +341,21 @@ class Bowtie2Aligner:
             logger.error(f"运行Bowtie2时出错: {e}")
             return False, ""
 
-    def _sam_to_bam(self, sam_file: str, bam_file: str, sample_name: str) -> bool:
-        """转换SAM到BAM并排序"""
+    def _sam_to_bam(self, sam_file: str, bam_file: str, sample_name: str,
+                    threads: int = 4, keep_sam: bool = False) -> bool:
+        """
+        转换SAM到BAM并排序
+
+        参数:
+            sam_file: 输入SAM文件路径
+            bam_file: 输出BAM文件路径
+            sample_name: 样本名称
+            threads: 排序使用的线程数
+            keep_sam: 是否保留中间SAM文件
+
+        返回:
+            bool: 转换是否成功
+        """
         try:
             # 检查samtools是否可用
             samtools_check = subprocess.run(
@@ -347,29 +368,125 @@ class Bowtie2Aligner:
                 logger.warning("samtools不可用，跳过SAM到BAM转换")
                 return False
 
-            # SAM到BAM转换
-            logger.info(f"转换SAM到BAM: {sample_name}")
+            # 检查SAM文件是否存在
+            sam_path = Path(sam_file)
+            if not sam_path.exists():
+                logger.error(f"SAM文件不存在: {sam_file}")
+                return False
+
+            # 检查SAM文件大小
+            sam_size = sam_path.stat().st_size
+            if sam_size == 0:
+                logger.warning(f"SAM文件为空: {sam_file}")
+                if not keep_sam:
+                    sam_path.unlink(missing_ok=True)
+                return False
+
+            logger.info(f"转换SAM到BAM: {sample_name} (文件大小: {sam_size/1024/1024:.2f} MB)")
+
+            # 步骤1: SAM到BAM转换
+            logger.debug(f"步骤1: SAM到BAM转换")
             view_cmd = ["samtools", "view", "-bS", sam_file]
-            sort_cmd = ["samtools", "sort", "-o", bam_file]
 
-            # 使用管道
-            view_process = subprocess.Popen(view_cmd, stdout=subprocess.PIPE)
-            sort_process = subprocess.Popen(sort_cmd, stdin=view_process.stdout)
+            # 步骤2: 排序BAM
+            logger.debug(f"步骤2: 排序BAM (线程数: {threads})")
+            sort_cmd = ["samtools", "sort", "-@", str(threads), "-o", bam_file]
 
-            view_process.stdout.close()
-            sort_process.communicate()
+            # 使用管道连接两个步骤
+            try:
+                view_process = subprocess.Popen(view_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                sort_process = subprocess.Popen(sort_cmd, stdin=view_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-            if sort_process.returncode == 0:
-                logger.info(f"BAM文件已创建: {bam_file}")
-                # 删除临时SAM文件
-                Path(sam_file).unlink(missing_ok=True)
+                view_process.stdout.close()
+                sort_stdout, sort_stderr = sort_process.communicate()
+
+                # 检查错误
+                if view_process.returncode != 0:
+                    logger.error(f"SAM到BAM转换步骤失败，返回码: {view_process.returncode}")
+                    if view_process.stderr:
+                        logger.error(f"错误信息: {view_process.stderr.read().decode() if hasattr(view_process.stderr, 'read') else view_process.stderr}")
+                    return False
+
+                if sort_process.returncode != 0:
+                    logger.error(f"BAM排序步骤失败，返回码: {sort_process.returncode}")
+                    if sort_stderr:
+                        logger.error(f"错误信息: {sort_stderr.decode()}")
+                    return False
+
+            except Exception as pipe_error:
+                logger.error(f"管道执行失败: {pipe_error}")
+                # 回退到分步执行
+                return self._sam_to_bam_stepwise(sam_file, bam_file, sample_name, threads, keep_sam)
+
+            # 验证输出文件
+            bam_path = Path(bam_file)
+            if bam_path.exists() and bam_path.stat().st_size > 0:
+                logger.info(f"BAM文件已创建: {bam_file} (大小: {bam_path.stat().st_size/1024/1024:.2f} MB)")
+
+                # 检查BAM文件是否有效
+                check_cmd = ["samtools", "quickcheck", bam_file]
+                check_result = subprocess.run(check_cmd, capture_output=True, text=True)
+                if check_result.returncode == 0:
+                    logger.info(f"BAM文件验证通过: {bam_file}")
+                else:
+                    logger.warning(f"BAM文件验证失败: {check_result.stderr}")
+
+                # 删除临时SAM文件（如果不需要保留）
+                if not keep_sam:
+                    try:
+                        sam_path.unlink(missing_ok=True)
+                        logger.debug(f"临时SAM文件已删除: {sam_file}")
+                    except Exception as del_error:
+                        logger.warning(f"删除SAM文件失败: {del_error}")
+
                 return True
             else:
-                logger.error(f"SAM到BAM转换失败: {sample_name}")
+                logger.error(f"BAM文件创建失败或为空: {bam_file}")
                 return False
 
         except Exception as e:
             logger.error(f"SAM到BAM转换时出错: {e}")
+            return False
+
+    def _sam_to_bam_stepwise(self, sam_file: str, bam_file: str, sample_name: str,
+                           threads: int = 4, keep_sam: bool = False) -> bool:
+        """分步执行SAM到BAM转换（管道失败时的回退方法）"""
+        try:
+            logger.info(f"使用分步方法转换SAM到BAM: {sample_name}")
+
+            # 中间BAM文件
+            temp_bam = bam_file.replace('.bam', '_temp.bam')
+
+            # 步骤1: SAM到BAM
+            logger.debug(f"步骤1: SAM到中间BAM")
+            view_cmd = ["samtools", "view", "-bS", "-o", temp_bam, sam_file]
+            view_result = subprocess.run(view_cmd, capture_output=True, text=True)
+
+            if view_result.returncode != 0:
+                logger.error(f"SAM到BAM转换失败: {view_result.stderr}")
+                Path(temp_bam).unlink(missing_ok=True)
+                return False
+
+            # 步骤2: 排序
+            logger.debug(f"步骤2: 排序BAM")
+            sort_cmd = ["samtools", "sort", "-@", str(threads), "-o", bam_file, temp_bam]
+            sort_result = subprocess.run(sort_cmd, capture_output=True, text=True)
+
+            # 删除中间文件
+            Path(temp_bam).unlink(missing_ok=True)
+
+            if sort_result.returncode != 0:
+                logger.error(f"BAM排序失败: {sort_result.stderr}")
+                return False
+
+            # 删除临时SAM文件
+            if not keep_sam:
+                Path(sam_file).unlink(missing_ok=True)
+
+            return True
+
+        except Exception as e:
+            logger.error(f"分步转换失败: {e}")
             return False
 
     def _index_bam(self, bam_file: str, sample_name: str) -> bool:
@@ -531,7 +648,8 @@ def load_config(config_file: Optional[str] = None) -> Dict[str, Any]:
         'pe_max_insert': 1000,
         'bowtie2_path': 'bowtie2',
         'min_len': 18,
-        'max_len': 35
+        'max_len': 35,
+        'keep_sam': False
     }
 
     if config_file and Path(config_file).exists():

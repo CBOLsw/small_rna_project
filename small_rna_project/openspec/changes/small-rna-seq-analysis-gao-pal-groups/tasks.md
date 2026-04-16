@@ -12,24 +12,24 @@
 - [x] 2.2 编写Trimmomatic质量修剪脚本 `scripts/qc/trim_fastq.py`
 - [x] 2.3 实现质控结果汇总功能，生成所有样本的质量控制报告
 - [x] 2.4 创建质控可视化脚本，生成reads数条形图、质量分布热图等图表
-- [ ] 2.5 测试数据质控模块，确保正确处理原始fastq文件
+- [x] 2.5 测试数据质控模块，确保正确处理原始fastq文件（`scripts/qc/test_qc.py`）
 
 ## 3. 序列比对模块
 
 - [x] 3.1 构建Bowtie2参考基因组索引 `scripts/alignment/build_bowtie2_index.py`
 - [x] 3.2 编写Bowtie2比对脚本 `scripts/alignment/run_bowtie2.py`，支持small RNA短序列参数优化
-- [ ] 3.3 实现SAM到BAM格式转换和排序功能
-- [ ] 3.4 编写比对统计脚本，计算每个样本的比对率、唯一比对率
-- [ ] 3.5 创建比对质量评估脚本，生成比对质量分布图和基因组覆盖度分析
+- [x] 3.3 实现SAM到BAM格式转换和排序功能（在`run_bowtie2.py`中增强）
+- [x] 3.4 编写比对统计脚本 `scripts/alignment/alignment_stats.py`，计算每个样本的比对率、唯一比对率
+- [x] 3.5 创建比对质量评估脚本 `scripts/alignment/bam_quality_assessment.py`，生成比对质量分布图和基因组覆盖度分析
 
 ## 4. 基因计数和差异表达分析模块
 
-- [ ] 4.1 编写featureCounts基因计数脚本 `scripts/expression/count_features.py`
-- [ ] 4.2 创建基因表达矩阵生成脚本，整合所有样本的计数结果
-- [ ] 4.3 实现DESeq2差异表达分析脚本 `scripts/expression/deseq2_analysis.R`
-- [ ] 4.4 编写差异基因筛选和结果导出功能
-- [ ] 4.5 创建差异表达可视化脚本，生成火山图、热图、MA图
-- [ ] 4.6 测试差异表达分析模块，验证统计结果的正确性
+- [x] 4.1 编写featureCounts基因计数脚本 `scripts/expression/count_features.py`
+- [x] 4.2 创建基因表达矩阵生成脚本 `scripts/expression/generate_expression_matrix.py`，整合所有样本的计数结果
+- [x] 4.3 实现DESeq2差异表达分析脚本 `scripts/expression/deseq2_analysis.R`
+- [x] 4.4 编写差异基因筛选和结果导出功能 `scripts/expression/filter_degs.py`
+- [x] 4.5 创建差异表达可视化脚本 `scripts/expression/visualize_degs.py`，生成火山图、热图、MA图
+- [x] 4.6 测试差异表达分析模块 `scripts/expression/test_expression.py`，验证统计结果的正确性
 
 ## 5. de novo motif发现模块
 
