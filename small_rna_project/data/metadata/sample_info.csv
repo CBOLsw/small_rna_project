@@ -1,7 +1,0 @@
-sample,group,replicate,fastq_r1,fastq_r2,description
-GAO_1,GAO,1,data/raw_fastq/fastq_files/HeLa-GAO1_S87_L002_R1_001.fastq.gz,data/raw_fastq/fastq_files/HeLa-GAO1_S87_L002_R2_001.fastq.gz,GAO组重复1双端测序
-GAO_2,GAO,2,data/raw_fastq/fastq_files/HeLa-GAO2_S58_L004_R1_001.fastq.gz,data/raw_fastq/fastq_files/HeLa-GAO2_S58_L004_R2_001.fastq.gz,GAO组重复2双端测序
-GAO_3,GAO,3,data/raw_fastq/fastq_files/HeLa-GAO3_S59_L004_R1_001.fastq.gz,data/raw_fastq/fastq_files/HeLa-GAO3_S59_L004_R2_001.fastq.gz,GAO组重复3双端测序
-PAL_1,PAL,1,data/raw_fastq/fastq_files/HeLa-PAL1_S51_L001_R1_001.fastq.gz,data/raw_fastq/fastq_files/HeLa-PAL1_S51_L001_R2_001.fastq.gz,PAL组重复1双端测序
-PAL_2,PAL,2,data/raw_fastq/fastq_files/HeLa-PAL2_S52_L001_R1_001.fastq.gz,data/raw_fastq/fastq_files/HeLa-PAL2_S52_L001_R2_001.fastq.gz,PAL组重复2双端测序
-PAL_3,PAL,3,data/raw_fastq/fastq_files/HeLa-PAL3_S86_L002_R1_001.fastq.gz,data/raw_fastq/fastq_files/HeLa-PAL3_S86_L002_R2_001.fastq.gz,PAL组重复3双端测序

@@ -23,7 +23,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 项目结构
 
 ```
-small_rna_project/
 ├── data/                           # 数据目录
 │   ├── raw_fastq/                 # 原始fastq测序文件
 │   ├── processed/                 # 处理后的中间文件
@@ -74,7 +73,7 @@ small_rna_project/
 ### 环境设置
 ```bash
 # 创建conda环境（基于设计文档中的工具选择）
-conda env create -f small_rna_project/envs/small_rna_analysis.yaml
+conda env create -f envs/small_rna_analysis.yaml
 
 # 激活环境
 conda activate small_rna_analysis
@@ -83,7 +82,7 @@ conda activate small_rna_analysis
 ### 流程执行（待实现）
 ```bash
 # 运行完整分析流程（Snakemake）
-snakemake --cores 4 --configfile small_rna_project/config/config.yaml
+snakemake --cores 4 --configfile config/config.yaml
 
 # 运行特定模块
 snakemake --cores 4 alignment
@@ -95,10 +94,10 @@ snakemake --dag | dot -Tpng > workflow.png
 ### 测试命令
 ```bash
 # 运行数据质控测试
-python small_rna_project/scripts/qc/fastqc_analysis.py --test
+python scripts/qc/fastqc_analysis.py --test
 
 # 运行差异表达分析测试
-Rscript small_rna_project/scripts/expression/deseq2_analysis.R --test
+Rscript scripts/expression/deseq2_analysis.R --test
 ```
 
 ## 架构要点
@@ -156,8 +155,8 @@ Rscript small_rna_project/scripts/expression/deseq2_analysis.R --test
 
 ## 快速开始
 
-1. 设置conda环境：`conda env create -f small_rna_project/envs/small_rna_analysis.yaml`
-2. 准备参考数据：下载hg38到`small_rna_project/references/`
-3. 更新样本信息：编辑`small_rna_project/data/metadata/sample_info.csv`
-4. 运行分析流程：`snakemake --cores 4 --configfile small_rna_project/config/config.yaml`
-5. 查看结果：`small_rna_project/results/` 和 `small_rna_project/reports/`
+1. 设置conda环境：`conda env create -f envs/small_rna_analysis.yaml`
+2. 准备参考数据：下载hg38到`references/`
+3. 更新样本信息：编辑`data/metadata/sample_info.csv`
+4. 运行分析流程：`snakemake --cores 4 --configfile config/config.yaml`
+5. 查看结果：`results/` 和 `reports/`

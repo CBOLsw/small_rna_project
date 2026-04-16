@@ -6,7 +6,7 @@
 ## 目录结构说明
 
 ```
-small_rna_project/
+.
 ├── data/                           # 数据目录
 │   ├── raw_fastq/                 # 原始fastq测序文件
 │   ├── processed/                 # 处理后的中间文件
