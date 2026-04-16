@@ -33,7 +33,7 @@
 
 ## 5. de novo motif发现模块
 
-- [ ] 5.1 编写差异基因序列提取脚本 `scripts/motif/extract_sequences.py`
+- [x] 5.1 编写差异基因序列提取脚本 `scripts/motif/extract_sequences.py`（基础框架完成）
 - [ ] 5.2 创建MEME motif分析脚本 `scripts/motif/run_meme.py`
 - [ ] 5.3 实现TomTom motif比较脚本，与已知motif数据库比对
 - [ ] 5.4 编写motif结果过滤和验证功能，去除假阳性结果
