@@ -1,0 +1,33 @@
+# 构建上下文排除文件
+.claude/
+.idea/
+.git/
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.dll
+*.dylib
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+
+# 数据和结果文件（避免大文件）
+data/raw_fastq/
+data/processed/
+references/*.fa
+references/*.fasta
+references/*.fai
+references/bowtie2_index/
+results/
+logs/
+reports/
+
+# 环境文件
+.vscode/
+.DS_Store
+Thumbs.db

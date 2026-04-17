@@ -1,0 +1,20 @@
+{
+  "report_generation_time": "2026-04-17 20:33:58",
+  "project_name": "small_rna_analysis_gao_pal",
+  "samples_analyzed": 0,
+  "qc_results": 0,
+  "alignment_results": 0,
+  "genes_expressed": 0,
+  "differential_genes": 0,
+  "motifs_found": 0,
+  "config": {
+    "sample_groups": [
+      "GAO",
+      "PAL"
+    ],
+    "reference_genome": "hg38.fa",
+    "alignment_tool": "Bowtie2",
+    "expression_analysis": "DESeq2",
+    "motif_discovery": "MEME Suite"
+  }
+}

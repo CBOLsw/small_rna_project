@@ -1,0 +1,103 @@
+# Small RNA测序分析流程配置文件
+# 项目名称
+project_name: "small_rna_analysis_gao_pal"
+
+# 样本信息配置
+samples:
+  metadata_file: "data/metadata/sample_info.csv"
+  group_column: "group"
+  sample_column: "sample_id"
+  groups:
+    - "GAO"
+    - "PAL"
+
+# 数据目录配置
+directories:
+  raw_fastq: "data/raw_fastq"
+  processed: "data/processed"
+  references: "references"
+  results: "results"
+  logs: "logs"
+  reports: "reports"
+
+# 参考基因组配置
+reference:
+  genome_fasta: "references/hg38.fa"
+  genome_index: "references/hg38.fa.fai"
+  bowtie2_index: "references/bowtie2_index/hg38"
+  gtf_annotation: "references/hg38.gtf"
+
+# 质量控制参数
+quality_control:
+  fastqc:
+    threads: 4
+  trimmomatic:
+    threads: 4
+    leading: 3
+    trailing: 3
+    slidingwindow: "4:15"
+    minlen: 18
+    adapter_file: "TruSeq3-SE.fa"
+
+# 序列比对参数
+alignment:
+  bowtie2:
+    threads: 8
+    preset: "very-sensitive-local"
+    seed_length: 15
+    max_mismatches: 1
+    k: 10
+  samtools:
+    threads: 4
+
+# 基因计数参数
+counting:
+  featureCounts:
+    threads: 8
+    strandness: 0  # 0=unstranded, 1=stranded, 2=reverse-stranded
+    min_overlap: 1
+    count_multi_mapping: false
+
+# 差异表达分析参数
+differential_expression:
+  deseq2:
+    padj_threshold: 0.05
+    log2fc_threshold: 1.0
+    shrinkage: true
+
+# motif分析参数
+motif_analysis:
+  meme:
+    min_width: 6
+    max_width: 12
+    max_motifs: 10
+    evalue_threshold: 1e-4
+    threads: 8
+  tomtom:
+    database: "JASPAR_vertebrates"
+    evalue_threshold: 0.05
+    min_overlap: 5
+  filtering:
+    evalue_threshold: 1e-4
+    min_sites: 5
+    min_width: 6
+    max_width: 12
+
+# Snakemake配置
+snakemake:
+  cores: 8
+  latency_wait: 60
+  restart_times: 2
+  keep_going: true
+
+# 可视化参数
+visualization:
+  dpi: 300
+  figure_format: "png"
+  color_palette: "Set2"
+
+# 执行参数
+execution:
+  dry_run: false
+  quiet: false
+  verbose: true

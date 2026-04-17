@@ -14,7 +14,7 @@ dependencies:
   - cutadapt=4.6  # 备选接头去除工具
 
   # 序列比对和SAM/BAM处理
-  - bowtie2=2.5
+  - bowtie2
   - samtools=1.17
 
   # 基因计数
