@@ -128,13 +128,13 @@ if conda env list | grep -q "small_rna_analysis"; then
         print_info "删除旧环境..."
         conda env remove -n small_rna_analysis -y
         print_info "重新安装环境..."
-        ./setup_complete.sh
+        ./scripts/setup/setup_complete.sh
     else
         print_info "跳过环境安装"
     fi
 else
     print_info "开始安装conda环境..."
-    ./setup_complete.sh
+    ./scripts/setup/setup_complete.sh
 fi
 
 # 完成
