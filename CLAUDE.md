@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> **重要提示：这个文件主要是给Claude Code使用的项目指导文档。如果您是用户，请先查看README.md文件了解如何使用本项目。**
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## 项目概述
@@ -28,7 +30,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 │   ├── processed/                 # 处理后的中间文件
 │   └── metadata/                  # 样本信息文件
 ├── references/                    # 参考基因组文件
-├── scripts/                       # 分析脚本目录（待实现）
+├── scripts/                       # 分析脚本目录
+│   ├── qc/                       # 质量控制脚本
+│   ├── alignment/                # 序列比对脚本
+│   ├── expression/               # 基因表达分析脚本
+│   ├── motif/                    # Motif分析脚本
+│   ├── setup/                    # 环境设置和工具下载脚本
+│   └── utils/                    # 工具和辅助脚本
 ├── results/                       # 分析结果目录
 │   ├── qc/                       # 质量控制结果
 │   ├── alignment/                # 序列比对结果
@@ -79,7 +87,7 @@ conda env create -f envs/small_rna_analysis.yaml
 conda activate small_rna_analysis
 ```
 
-### 流程执行（待实现）
+### 流程执行
 ```bash
 # 运行完整分析流程（Snakemake）
 snakemake --cores 4 --configfile config/config.yaml
@@ -98,6 +106,9 @@ python scripts/qc/fastqc_analysis.py --test
 
 # 运行差异表达分析测试
 Rscript scripts/expression/deseq2_analysis.R --test
+
+# 运行项目状态检查
+python scripts/utils/final_check.py
 ```
 
 ## 架构要点
