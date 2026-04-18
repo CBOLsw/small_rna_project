@@ -169,13 +169,20 @@ if [ $? -eq 0 ]; then
     print_info "配置环境内的R镜像..."
     R_PROFILE_PATH="$CONDA_PREFIX/.Rprofile"
     cat > "$R_PROFILE_PATH" << 'EOFR'
+# R镜像源配置
 options(BioC_mirror = "https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
 options(repos = c(CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
+message("R镜像配置完成:")
+message("  - Bioconductor: https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
+message("  - CRAN: https://mirrors.tuna.tsinghua.edu.cn/CRAN/")
 EOFR
 
     # 安装DESeq2和其他Bioconductor包
     print_info "正在安装DESeq2..."
-    R -e "options(BioC_mirror='https://mirrors.tuna.tsinghua.edu.cn/bioconductor'); options(repos = c(CRAN='https://mirrors.tuna.tsinghua.edu.cn/CRAN/')); if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager'); BiocManager::install('DESeq2', ask=FALSE)" 2>&1 > /dev/null
+    R -e "options(BioC_mirror='https://mirrors.tuna.tsinghua.edu.cn/bioconductor');
+          options(repos = c(CRAN='https://mirrors.tuna.tsinghua.edu.cn/CRAN/'));
+          if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager');
+          BiocManager::install('DESeq2', ask=FALSE)" 2>&1 > /dev/null
     print_success "DESeq2安装完成"
 
 else

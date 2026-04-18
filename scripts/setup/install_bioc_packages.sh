@@ -59,7 +59,7 @@ for i in "${!packages[@]}"; do
 
     print_progress $current_step $total_packages "正在安装 $package"
 
-    # 使用清华镜像安装
+    # 直接使用清华镜像安装
     if R -e "options(BioC_mirror='https://mirrors.tuna.tsinghua.edu.cn/bioconductor');
               if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager');
               options(repos = c(CRAN = 'https://mirrors.tuna.tsinghua.edu.cn/CRAN/'));
@@ -67,17 +67,7 @@ for i in "${!packages[@]}"; do
         print_success "$package 安装成功"
     else
         print_error "$package 安装失败"
-        # 尝试使用官方源作为备用
-        print_info "尝试使用官方源安装 $package..."
-        if R -e "options(BioC_mirror='https://bioconductor.org');
-                  if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager');
-                  options(repos = c(CRAN = 'https://cran.r-project.org/'));
-                  BiocManager::install('$package', ask=FALSE, force=TRUE, update=FALSE)" 2>&1 > /dev/null; then
-            print_success "$package 安装成功"
-        else
-            print_error "$package 官方源安装也失败"
-            exit 1
-        fi
+        exit 1
     fi
 done
 
