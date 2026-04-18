@@ -99,6 +99,69 @@ ls -lh references/
 ls -lh data/raw_fastq/fastq_files/
 ```
 
+## WSL2环境配置问题
+
+**重要提示：如果您遇到以下问题，请检查您的conda环境是否正确配置**
+
+### 常见问题
+
+#### 1. trimmomatic无法找到或安装失败
+
+**问题现象：**
+- `Error: Unable to access jarfile trimmomatic`
+- `conda install trimmomatic` 失败
+- `conda list trimmomatic` 无输出
+
+**原因分析：**
+- 您可能在WSL2中使用了Windows的conda（路径包含`/e/Anaconda`或Windows驱动器路径）
+- Windows的conda包和WSL2的包兼容性问题
+
+**解决方案：**
+
+**方案1：在WSL2中安装Linux版Miniconda（推荐）**
+
+```bash
+# 1. 在WSL2中下载并安装Linux版Miniconda
+cd ~
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+
+# 2. 安装（使用WSL2的默认位置）
+bash miniconda.sh -b -p $HOME/miniconda
+
+# 3. 初始化conda（在WSL2的bash shell中）
+eval "$(/home/qzp/miniconda/bin/conda shell.bash hook)"
+conda init bash
+
+# 4. 重新打开终端（或 source ~/.bashrc）
+exec bash
+
+# 5. 创建项目的conda环境
+cd /c/Users/24584/PycharmProjects/small_rna_project
+conda env create -f envs/small_rna_analysis.yaml
+
+# 6. 激活环境
+conda activate small_rna_analysis
+
+# 7. 验证安装
+conda list trimmomatic  # 现在应该显示trimmomatic=0.39
+which trimmomatic       # 应该指向WSL2中的位置
+```
+
+**方案2：使用现有Windows conda的替代方案**
+
+如果不想重新安装，尝试在WSL2中创建Linux版环境：
+
+```bash
+conda create -n small_rna_analysis_linux python=3.9 -c bioconda trimmomatic=0.39 fastqc bowtie2 samtools
+```
+
+### 如何判断conda环境是否正确
+
+**正确的WSL2 conda特征：**
+- `which conda` 应该指向WSL2的路径，如 `/home/qzp/miniconda/bin/conda`
+- `conda info --envs` 显示的路径应该是 `/home/qzp/miniconda/envs/`
+- `conda list trimmomatic` 应该显示 `trimmomatic 0.39`
+
 ## 安装完成后的分析流程操作
 
 ### 1. 激活分析环境
