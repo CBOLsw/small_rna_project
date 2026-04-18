@@ -102,14 +102,14 @@ EOF
 print_success "Conda镜像源配置完成"
 
 # 4. 配置R镜像源
-print_step "4" "配置R镜像源（清华源）"
+print_step "4" "配置R镜像源"
 mkdir -p ~/.R
 cat > ~/.Rprofile << 'EOFR'
-options(BioC_mirror = "https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
+# 使用官方Bioconductor源（清华Bioconductor镜像同步有问题）
 options(repos = c(CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
-message("已配置使用清华镜像源:")
-message("  - Bioconductor: https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
+message("已配置使用镜像源:")
 message("  - CRAN: https://mirrors.tuna.tsinghua.edu.cn/CRAN/")
+message("  - Bioconductor: 官方源")
 EOFR
 print_success "R镜像源配置完成"
 
@@ -170,17 +170,15 @@ if [ $? -eq 0 ]; then
     R_PROFILE_PATH="$CONDA_PREFIX/.Rprofile"
     cat > "$R_PROFILE_PATH" << 'EOFR'
 # R镜像源配置
-options(BioC_mirror = "https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
 options(repos = c(CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
 message("R镜像配置完成:")
-message("  - Bioconductor: https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
 message("  - CRAN: https://mirrors.tuna.tsinghua.edu.cn/CRAN/")
+message("  - Bioconductor: 官方源")
 EOFR
 
     # 安装DESeq2和其他Bioconductor包
     print_info "正在安装DESeq2..."
-    R -e "options(BioC_mirror='https://mirrors.tuna.tsinghua.edu.cn/bioconductor');
-          options(repos = c(CRAN='https://mirrors.tuna.tsinghua.edu.cn/CRAN/'));
+    R -e "options(repos = c(CRAN='https://mirrors.tuna.tsinghua.edu.cn/CRAN/'));
           if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager');
           BiocManager::install('DESeq2', ask=FALSE)" 2>&1 > /dev/null
     print_success "DESeq2安装完成"

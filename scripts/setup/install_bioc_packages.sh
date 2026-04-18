@@ -59,10 +59,9 @@ for i in "${!packages[@]}"; do
 
     print_progress $current_step $total_packages "正在安装 $package"
 
-    # 直接使用清华镜像安装
-    if R -e "options(BioC_mirror='https://mirrors.tuna.tsinghua.edu.cn/bioconductor');
+    # 使用官方Bioconductor源（清华Bioconductor镜像同步有问题）
+    if R -e "options(repos = c(CRAN = 'https://mirrors.tuna.tsinghua.edu.cn/CRAN/'));
               if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager');
-              options(repos = c(CRAN = 'https://mirrors.tuna.tsinghua.edu.cn/CRAN/'));
               BiocManager::install('$package', ask=FALSE, force=TRUE, update=FALSE)" 2>&1 > /dev/null; then
         print_success "$package 安装成功"
     else
