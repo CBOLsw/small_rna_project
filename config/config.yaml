@@ -6,7 +6,7 @@ project_name: "small_rna_analysis_gao_pal"
 samples:
   metadata_file: "data/metadata/sample_info.csv"
   group_column: "group"
-  sample_column: "sample_id"
+  sample_column: "sample"
   groups:
     - "GAO"
     - "PAL"

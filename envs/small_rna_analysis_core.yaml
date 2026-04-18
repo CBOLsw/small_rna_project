@@ -1,0 +1,38 @@
+name: small_rna_analysis
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # 核心Python环境
+  - python=3.9
+  - pip
+
+  # 基础生物信息学工具
+  - fastqc=0.12
+  - bowtie2
+  - samtools=1.17
+  - subread=2.0
+
+  # R基础环境
+  - r-base=4.3
+  - r-essentials
+  - r-tidyverse
+  - r-ggplot2
+  - r-pheatmap
+
+  # Python库
+  - pandas=2.1.4
+  - numpy=1.26.2
+  - matplotlib=3.8.2
+  - seaborn=0.13.0
+  - jupyter=1.0.0
+  - notebook=7.0.6
+
+  # 流程管理
+  - snakemake=7.32
+
+  # pip包
+  - pip:
+    - biopython==1.81
+    - pysam==0.21.0

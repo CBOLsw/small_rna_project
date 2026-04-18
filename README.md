@@ -149,10 +149,13 @@ snakemake --cores 8 --configfile config/config.yaml
 
 ## 文档索引
 
+- `docs/environment_setup.md` - **完整环境配置指南**（新增）
+- `setup_complete.sh` - **一键环境安装脚本**（新增）
 - `docs/user_guide.md` - 详细使用指南
 - `docs/technical_manual.md` - 技术实现细节
 - `config/config.yaml` - 分析参数配置
 - `envs/small_rna_analysis.yaml` - Conda环境配置
+- `envs/small_rna_analysis_windows.yaml` - Windows兼容环境配置
 - `openspec/changes/small-rna-seq-analysis-gao-pal-groups/tasks.md` - 完整任务列表
 
 ## 注意事项

@@ -4,6 +4,8 @@ Small RNA测序分析流程 - Snakemake流程文件
 """
 
 import os
+import sys
+import inspect
 import pandas as pd
 from pathlib import Path
 
@@ -24,6 +26,17 @@ def get_samples():
                 ("PAL_1", "PAL"), ("PAL_2", "PAL"), ("PAL_3", "PAL")]
 
 SAMPLES = get_samples()
+
+# 从样本信息中获取fastq R1文件路径
+def get_sample_fastq_r1(sample):
+    """根据样本ID获取对应的R1 fastq文件路径"""
+    if os.path.exists(config["samples"]["metadata_file"]):
+        df = pd.read_csv(config["samples"]["metadata_file"])
+        sample_row = df[df[config["samples"]["sample_column"]] == sample]
+        if not sample_row.empty and "fastq_r1" in df.columns:
+            return sample_row.iloc[0]["fastq_r1"]
+    # 默认回退
+    return os.path.join(config["directories"]["raw_fastq"], f"{sample}_R1.fastq.gz")
 
 # 日志配置
 LOG_DIR = config["directories"]["logs"]
@@ -66,7 +79,8 @@ rule all:
 rule run_fastqc:
     """运行FastQC质量控制"""
     input:
-        fastq=os.path.join(config["directories"]["raw_fastq"], "{sample}_R1.fastq.gz")
+        fastq=lambda wildcards: get_sample_fastq_r1(wildcards.sample),
+        dir_flag=os.path.join(config["directories"]["processed"], ".dir_exists")
     output:
         html=os.path.join(config["directories"]["results"], "qc", "{sample}_fastqc.html"),
         zip=os.path.join(config["directories"]["results"], "qc", "{sample}_fastqc.zip")
@@ -86,7 +100,8 @@ rule run_fastqc:
 rule run_trimmomatic:
     """运行Trimmomatic质量修剪"""
     input:
-        fastq=os.path.join(config["directories"]["raw_fastq"], "{sample}_R1.fastq.gz")
+        fastq=lambda wildcards: get_sample_fastq_r1(wildcards.sample),
+        dir_flag=os.path.join(config["directories"]["processed"], ".dir_exists")
     output:
         trimmed=os.path.join(config["directories"]["processed"], "{sample}_trimmed.fastq.gz")
     log:
@@ -97,10 +112,7 @@ rule run_trimmomatic:
         python scripts/qc/trim_fastq.py \
             --input {input.fastq} \
             --output {output.trimmed} \
-            --leading {config[quality_control][trimmomatic][leading]} \
-            --trailing {config[quality_control][trimmomatic][trailing]} \
-            --slidingwindow '{config[quality_control][trimmomatic][slidingwindow]}' \
-            --minlen {config[quality_control][trimmomatic][minlen]} \
+            --config config/config.yaml \
             --threads {threads} \
             2>&1 | tee {log}
         """
@@ -317,7 +329,7 @@ rule run_meme:
 rule filter_motifs:
     """过滤motif结果"""
     input:
-        meme_dir=os.path.join(config["directories"]["results"], "motif_analysis", "meme_results")
+        meme_summary=os.path.join(config["directories"]["results"], "motif_analysis", "meme_results", "meme_summary.json")
     output:
         os.path.join(config["directories"]["results"], "motif_analysis", "filtered_motifs.csv")
     log:
@@ -325,7 +337,7 @@ rule filter_motifs:
     shell:
         """
         python scripts/motif/filter_motifs.py \
-            --meme {input.meme_dir} \
+            --meme {config[directories][results]}/motif_analysis/meme_results \
             --output {config[directories][results]}/motif_analysis \
             --evalue {config[motif_analysis][filtering][evalue_threshold]} \
             --min-sites {config[motif_analysis][filtering][min_sites]} \
@@ -338,7 +350,7 @@ rule filter_motifs:
 rule run_tomtom:
     """运行TomTom motif比较分析"""
     input:
-        meme_dir=os.path.join(config["directories"]["results"], "motif_analysis", "meme_results")
+        meme_summary=os.path.join(config["directories"]["results"], "motif_analysis", "meme_results", "meme_summary.json")
     output:
         summary=os.path.join(config["directories"]["results"], "motif_analysis", "tomtom_results", "tomtom_summary.json")
     log:
@@ -346,7 +358,7 @@ rule run_tomtom:
     shell:
         """
         python scripts/motif/tomtom_comparison.py \
-            --meme-output {input.meme_dir} \
+            --meme-output {config[directories][results]}/motif_analysis/meme_results \
             --output {config[directories][results]}/motif_analysis/tomtom_results \
             --db {config[motif_analysis][tomtom][database]} \
             --evalth {config[motif_analysis][tomtom][evalue_threshold]} \
@@ -358,8 +370,8 @@ rule run_tomtom:
 rule visualize_motifs:
     """可视化motif结果"""
     input:
-        meme_dir=os.path.join(config["directories"]["results"], "motif_analysis", "meme_results"),
-        filtered_dir=os.path.join(config["directories"]["results"], "motif_analysis")
+        meme_summary=os.path.join(config["directories"]["results"], "motif_analysis", "meme_results", "meme_summary.json"),
+        filtered_motifs=os.path.join(config["directories"]["results"], "motif_analysis", "filtered_motifs.csv")
     output:
         overview=os.path.join(config["directories"]["results"], "motif_analysis", "visualization", "motif_overview.png")
     log:
@@ -367,8 +379,8 @@ rule visualize_motifs:
     shell:
         """
         python scripts/motif/visualize_motifs.py \
-            --meme {input.meme_dir} \
-            --filtered {input.filtered_dir} \
+            --meme {config[directories][results]}/motif_analysis/meme_results \
+            --filtered {config[directories][results]}/motif_analysis \
             --output {config[directories][results]}/motif_analysis/visualization \
             --format {config[visualization][figure_format]} \
             --dpi {config[visualization][dpi]} \
@@ -405,6 +417,4 @@ rule create_directories:
         """
 
 # 设置目录创建规则在其他规则之前运行
-for r in rulelist:
-    if r.name != "create_directories" and r.name != "all":
-        r.input += [os.path.join(config["directories"]["processed"], ".dir_exists")]
+# 注意：直接在规则中显式定义依赖关系

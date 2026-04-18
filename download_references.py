@@ -107,10 +107,32 @@ class ReferenceDownloader:
 
     def download_small_rna_annotation(self) -> Optional[str]:
         """下载small RNA注释"""
-        url = "https://www.mirbase.org/ftp/CURRENT/genomes/hsa.gff3"
+        # 多个备选URL，按优先级尝试
+        url_candidates = [
+            "https://www.mirbase.org/ftp/CURRENT/genomes/hsa.gff3",  # 官方HTTPS
+            "http://www.mirbase.org/ftp/CURRENT/genomes/hsa.gff3",  # HTTP版本
+            "ftp://mirbase.org/pub/mirbase/CURRENT/genomes/hsa.gff3",  # FTP版本
+        ]
+
         dest_path = self.ref_dir / "hg38.mirbase.gff3"
 
-        return self.download_file(url, dest_path, "miRBase small RNA注释")
+        # 如果文件已存在，直接返回
+        if dest_path.exists():
+            logger.info(f"✓ miRBase small RNA注释已存在: {dest_path}")
+            return str(dest_path)
+
+        # 尝试每个URL
+        for i, url in enumerate(url_candidates):
+            logger.info(f"尝试下载miRBase注释 (源{i+1}/{len(url_candidates)}): {url}")
+            result = self.download_file(url, dest_path, "miRBase small RNA注释")
+            if result is not None:
+                logger.info(f"✓ 成功下载miRBase注释")
+                return result
+
+        # 所有URL都失败
+        logger.warning("所有miRBase下载源都失败，small RNA注释将不可用")
+        logger.warning("您可以手动从 https://www.mirbase.org/download/ 下载并放置到: " + str(dest_path))
+        return None
 
     def prepare_index_directory(self) -> Path:
         """准备Bowtie2索引目录"""

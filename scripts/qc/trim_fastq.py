@@ -410,7 +410,22 @@ def load_config(config_file: Optional[str] = None) -> Dict[str, Any]:
         try:
             with open(config_file, 'r') as f:
                 user_config = yaml.safe_load(f)
-                default_config.update(user_config)
+                # 从 config.yaml 的 quality_control.trimmomatic 部分读取配置
+                if 'quality_control' in user_config and 'trimmomatic' in user_config['quality_control']:
+                    trimmomatic_config = user_config['quality_control']['trimmomatic']
+                    if 'leading' in trimmomatic_config:
+                        default_config['leading_quality'] = trimmomatic_config['leading']
+                    if 'trailing' in trimmomatic_config:
+                        default_config['trailing_quality'] = trimmomatic_config['trailing']
+                    if 'slidingwindow' in trimmomatic_config:
+                        # slidingwindow 格式为 "4:15"，需要解析
+                        sw = trimmomatic_config['slidingwindow']
+                        if ':' in sw:
+                            window, quality = sw.split(':')
+                            default_config['window_size'] = int(window)
+                            default_config['required_quality'] = int(quality)
+                    if 'minlen' in trimmomatic_config:
+                        default_config['min_length'] = trimmomatic_config['minlen']
                 logger.info(f"已加载配置文件: {config_file}")
         except Exception as e:
             logger.warning(f"加载配置文件失败: {e}，使用默认配置")
