@@ -99,15 +99,112 @@ ls -lh references/
 ls -lh data/raw_fastq/fastq_files/
 ```
 
-## WSL2中配置项目环境
+## 从零开始：完整操作流程（WSL2）
+
+以下是从开启WSL2到运行分析的完整、逻辑正确的操作步骤：
+
+### 第一步：开启WSL2并进入项目目录
+
+```bash
+# 1. 打开WSL2终端
+# （在Windows中按Win+R，输入wsl，回车）
+
+# 2. 进入项目目录
+cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
+
+# 3. 确认当前位置
+pwd
+# 应该显示：/mnt/c/Users/24584/PycharmProjects/small_rna_project
+```
+
+### 第二步：检查并安装Miniconda（如果需要）
+
+```bash
+# 1. 检查是否已安装conda
+which conda
+
+# 2. 如果没有安装（显示not found），安装Linux版Miniconda：
+cd ~
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+bash miniconda.sh -b -p $HOME/miniconda
+
+# 3. 初始化conda
+eval "$($HOME/miniconda/bin/conda shell.bash hook)"
+conda init bash
+
+# 4. 重新加载shell配置
+source ~/.bashrc
+
+# 5. 验证conda安装成功
+which conda
+# 应该显示：/home/你的用户名/miniconda/bin/conda
+```
+
+### 第三步：创建并激活项目环境
+
+```bash
+# 1. 回到项目目录
+cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
+
+# 2. 创建conda环境（预计15-30分钟）
+conda env create -f envs/small_rna_analysis.yaml
+
+# 3. 激活环境
+conda activate small_rna_analysis
+
+# 4. 验证环境
+conda info --envs
+# 应该看到 small_rna_analysis 环境被激活（前面有*号）
+```
+
+### 第四步：安装Bioconductor包
+
+```bash
+# 确保已激活small_rna_analysis环境，然后运行：
+chmod +x scripts/setup/install_bioc_packages.sh
+./scripts/setup/install_bioc_packages.sh
+```
+
+### 第五步：检查项目状态
+
+```bash
+# 1. 运行项目状态检查
+python scripts/run_pipeline.py --config config/config.yaml --check
+
+# 2. 确认所有检查通过
+```
+
+### 第六步：运行分析流程
+
+```bash
+# 1. 查看将要执行的步骤（Dry-run）
+python scripts/run_pipeline.py --config config/config.yaml --dry-run
+
+# 2. 运行完整分析（使用8个CPU核心）
+python scripts/run_pipeline.py --config config/config.yaml --cores 8
+
+# 或者使用一键安装脚本（包含以上所有步骤）：
+# chmod +x scripts/setup/install_everything.sh
+# ./scripts/setup/install_everything.sh
+```
+
+---
+
+## WSL2环境故障排除
 
 **说明：本章节仅在您遇到以下问题时使用**
 
 - trimmomatic无法找到或安装失败
-- 使用了Windows的conda导致的conda环境
+- 使用了Windows的conda导致的环境问题
 - 在WSL2中看到Windows的conda环境
 
-**方案1：在WSL2中安装Linux版Miniconda（推荐）
+### 问题1：WSL2中使用了Windows的conda
+
+**症状：**
+- `which conda` 显示 `/mnt/c/Users/.../conda.exe`
+- 安装的工具无法在WSL2中正常运行
+
+**解决方案：在WSL2中安装Linux版Miniconda**
 
 ```bash
 # 1. 在WSL2中下载并安装Linux版Miniconda
@@ -118,14 +215,14 @@ wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O mi
 bash miniconda.sh -b -p $HOME/miniconda
 
 # 3. 初始化conda（在WSL2的bash shell中）
-eval "$(/home/qzp/miniconda/bin/conda shell.bash hook)"
+eval "$($HOME/miniconda/bin/conda shell.bash hook)"
 conda init bash
 
 # 4. 重新打开终端（或 source ~/.bashrc）
 exec bash
 
 # 5. 创建项目的conda环境
-cd /c/Users/24584/PycharmProjects/small_rna_project
+cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
 conda env create -f envs/small_rna_analysis.yaml
 
 # 6. 激活环境
@@ -133,10 +230,10 @@ conda activate small_rna_analysis
 
 # 7. 验证安装
 conda list trimmomatic  # 现在应该显示trimmomatic=0.39
-which trimmomatic       # 应该指向WSL2中的位置
+which trimmomatic       # 应该指向WSL2中的位置，如/home/.../miniconda/envs/.../bin/trimmomatic
 ```
 
-**方案2：使用现有Windows conda的替代方案**
+### 问题2：快速创建备用环境
 
 如果不想重新安装，尝试在WSL2中创建Linux版环境：
 
@@ -147,8 +244,8 @@ conda create -n small_rna_analysis_linux python=3.9 -c bioconda trimmomatic=0.39
 ### 如何判断conda环境是否正确
 
 **正确的WSL2 conda特征：**
-- `which conda` 应该指向WSL2的路径，如 `/home/qzp/miniconda/bin/conda`
-- `conda info --envs` 显示的路径应该是 `/home/qzp/miniconda/envs/`
+- `which conda` 应该指向WSL2的路径，如 `/home/你的用户名/miniconda/bin/conda`
+- `conda info --envs` 显示的路径应该是 `/home/你的用户名/miniconda/envs/`
 - `conda list trimmomatic` 应该显示 `trimmomatic 0.39`
 
 ## 安装完成后的分析流程操作
