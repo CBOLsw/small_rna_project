@@ -2,7 +2,6 @@
 
 # Small RNA项目完整环境安装脚本
 # 适用于WSL2/Linux系统
-# 使用mamba替代conda，速度提升10倍
 # 配置国内镜像源加速下载
 # 解决Bioconductor数据包（如GenomeInfoDbData）下载慢和卡住的问题
 
@@ -113,26 +112,18 @@ message("  - Bioconductor: 官方源")
 EOFR
 print_success "R镜像源配置完成"
 
-# 5. 安装mamba
-print_step "5" "检查/安装Mamba"
-if ! command -v mamba &> /dev/null; then
-    print_info "正在安装Mamba..."
-    conda install -y -c conda-forge mamba > /dev/null 2>&1
-fi
-print_success "Mamba已就绪"
-
-# 6. 删除旧环境
-print_step "6" "清理旧环境"
+# 5. 删除旧环境
+print_step "5" "清理旧环境"
 if conda env list | grep -q "small_rna_analysis"; then
     print_info "正在删除旧环境..."
-    mamba env remove -n small_rna_analysis -y > /dev/null 2>&1
+    conda env remove -n small_rna_analysis -y > /dev/null 2>&1
     print_success "旧环境已删除"
 else
     print_info "无旧环境需要清理"
 fi
 
-# 7. 预下载Bioconductor大包
-print_step "7" "预下载Bioconductor数据包"
+# 6. 预下载Bioconductor大包
+print_step "6" "预下载Bioconductor数据包"
 mkdir -p /tmp/bioc_packages
 cd /tmp/bioc_packages
 if [ ! -f "GenomeInfoDbData_1.2.11.tar.gz" ]; then
@@ -146,10 +137,10 @@ else
 fi
 cd -
 
-# 8. 创建新环境
-print_step "8" "创建Conda环境（使用Mamba加速）"
+# 7. 创建新环境
+print_step "7" "创建Conda环境"
 print_info "这可能需要15-25分钟，请耐心等待..."
-mamba env create -f envs/small_rna_analysis.yaml
+conda env create -f envs/small_rna_analysis.yaml
 
 if [ $? -eq 0 ]; then
     print_success "Conda环境创建成功"
@@ -158,7 +149,7 @@ if [ $? -eq 0 ]; then
     conda activate small_rna_analysis
 
     # 手动安装预下载的Bioconductor包
-    print_step "9" "安装Bioconductor数据包"
+    print_step "8" "安装Bioconductor数据包"
     if [ -f "/tmp/bioc_packages/GenomeInfoDbData_1.2.11.tar.gz" ]; then
         print_info "正在安装GenomeInfoDbData..."
         R -e "install.packages('/tmp/bioc_packages/GenomeInfoDbData_1.2.11.tar.gz', repos = NULL, type = 'source')" 2>&1 > /dev/null
@@ -182,14 +173,10 @@ EOFR
           if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager');
           BiocManager::install('DESeq2', ask=FALSE)" 2>&1 > /dev/null
     print_success "DESeq2安装完成"
-
-else
-    print_warning "环境创建失败，尝试使用conda..."
-    conda env create -f envs/small_rna_analysis.yaml
 fi
 
-# 9. 检查apt-get包
-print_step "10" "安装系统依赖（可选）"
+# 8. 检查apt-get包
+print_step "9" "安装系统依赖（可选）"
 if command -v apt-get &> /dev/null; then
     print_info "检测到Debian/Ubuntu系统，正在安装工具..."
     sudo apt-get update -qq && sudo apt-get install -qq -y fastqc samtools bowtie2 trimmomatic > /dev/null 2>&1
@@ -198,8 +185,8 @@ else
     print_info "跳过apt-get包安装（需手动安装生物信息学工具）"
 fi
 
-# 10. 检查项目文件
-print_step "11" "检查项目文件"
+# 9. 检查项目文件
+print_step "10" "检查项目文件"
 if [ -f "references/hg38.fa" ]; then
     print_success "参考基因组已存在"
 else
@@ -213,8 +200,8 @@ else
     print_warning "样本信息未找到"
 fi
 
-# 11. 清理
-print_step "12" "清理临时文件"
+# 10. 清理
+print_step "11" "清理临时文件"
 rm -rf /tmp/bioc_packages
 print_success "临时文件已清理"
 
