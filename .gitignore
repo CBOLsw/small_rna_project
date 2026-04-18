@@ -144,6 +144,9 @@ cython_debug/
 # Claude Code settings
 .claude/
 
+# OpenSpec change archive
+openspec/changes/archive/
+
 # Data files (should not be committed)
 data/
 results/
@@ -162,9 +165,13 @@ references/
 *.bed.gz
 *.gtf
 *.gff
+# 参考基因组大文件
 *.fa
 *.fasta
 *.fna
+
+# 但允许提交接头序列文件
+!config/VAHTS-SmallRNA-V2.fa
 
 # Temporary files
 *.tmp

@@ -71,6 +71,10 @@
 - **miRBase注释文件下载失败**：https://www.mirbase.org/ftp/CURRENT/genomes/hsa.gff3 返回404错误
 - **conda环境创建失败**：Windows系统上无法直接创建包含Bioconda工具的环境
 
+### 已完成的优化
+- **文库接头序列优化**：根据VAHTS Small RNA Library Prep Kit for Illumina V2文库结构，调整了trimmomatic的接头序列配置，从默认的`illumina_small_rna`改为`vahts_small_rna_v2`，并创建了对应的接头序列文件`config/VAHTS-SmallRNA-V2.fa`
+
+
 ### 解决方案建议
 1. 使用Windows Subsystem for Linux (WSL2) 运行完整流程
 2. 使用Docker容器运行分析

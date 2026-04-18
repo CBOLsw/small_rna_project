@@ -97,28 +97,33 @@ class ReferenceDownloader:
         except HTTPError as e:
             logger.error(f"  [ERROR] HTTP错误 ({e.code}): {e.reason}")
             if 'temp_path' in locals() and temp_path.exists():
-                temp_path.unlink()
+                try:
+                    temp_path.unlink()
+                except Exception as unlink_error:
+                    logger.warning(f"  [WARNING] 无法删除临时文件: {unlink_error}")
             return None
         except URLError as e:
             logger.error(f"  [ERROR] URL错误: {e.reason}")
             if 'temp_path' in locals() and temp_path.exists():
-                temp_path.unlink()
+                try:
+                    temp_path.unlink()
+                except Exception as unlink_error:
+                    logger.warning(f"  [WARNING] 无法删除临时文件: {unlink_error}")
             return None
         except Exception as e:
             logger.error(f"  [ERROR] 下载失败: {e}")
             if 'temp_path' in locals() and temp_path.exists():
-                temp_path.unlink()
+                try:
+                    temp_path.unlink()
+                except Exception as unlink_error:
+                    logger.warning(f"  [WARNING] 无法删除临时文件: {unlink_error}")
             return None
 
     def download_hg38_genome(self) -> Optional[str]:
-        """下载hg38参考基因组 - 使用国内镜像源"""
+        """下载hg38参考基因组 - 使用UCSC官方源"""
         url_candidates = [
-            # 源1：直接从1000 Genomes项目下载（较稳定）
-            "ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz",
-            # 源2：UCSC官方HTTPS
+            # 源1：UCSC官方HTTPS（稳定可用）
             "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz",
-            # 源3：NCBI refseq（备用）
-            "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc.fa.gz",
         ]
 
         dest_path = self.ref_dir / "hg38.fa"
@@ -134,12 +139,10 @@ class ReferenceDownloader:
         return None
 
     def download_hg38_gtf(self) -> Optional[str]:
-        """下载hg38基因注释 - 使用国内镜像源"""
+        """下载hg38基因注释 - 使用UCSC官方源"""
         url_candidates = [
-            # 源1：UCSC官方HTTPS（已知稳定）
+            # 源1：UCSC官方HTTPS（稳定可用）
             "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz",
-            # 源2：NCBI refseq（备用）
-            "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/GCA_000001405.15_GRCh38_genomic.gff.gz",
         ]
 
         dest_path = self.ref_dir / "hg38.gtf"

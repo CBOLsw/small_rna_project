@@ -37,7 +37,8 @@ quality_control:
     trailing: 3
     slidingwindow: "4:15"
     minlen: 18
-    adapter_file: "TruSeq3-SE.fa"
+    adapter_file: "VAHTS-SmallRNA-V2.fa"
+    adapter_type: "vahts_small_rna_v2"
 
 # 序列比对参数
 alignment:

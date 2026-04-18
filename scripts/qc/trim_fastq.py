@@ -40,7 +40,8 @@ class TrimmomaticProcessor:
         'illumina_universal': 'AGATCGGAAGAG',
         'illumina_small_rna': 'TGGAATTCTCGG',
         'nextera': 'CTGTCTCTTATA',
-        'truseq': 'AGATCGGAAGAGC'
+        'truseq': 'AGATCGGAAGAGC',
+        'vahts_small_rna_v2': 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'  # VAHTS Small RNA Library Prep Kit for Illumina V2
     }
 
     def __init__(self, trimmomatic_path: str = "trimmomatic",
@@ -394,7 +395,7 @@ def load_config(config_file: Optional[str] = None) -> Dict[str, Any]:
     """加载配置文件"""
     default_config = {
         'threads': 4,
-        'adapter': 'illumina_small_rna',
+        'adapter': 'vahts_small_rna_v2',  # 默认使用VAHTS接头
         'window_size': 4,
         'required_quality': 20,
         'leading_quality': 20,
@@ -426,6 +427,8 @@ def load_config(config_file: Optional[str] = None) -> Dict[str, Any]:
                             default_config['required_quality'] = int(quality)
                     if 'minlen' in trimmomatic_config:
                         default_config['min_length'] = trimmomatic_config['minlen']
+                    if 'adapter_type' in trimmomatic_config:
+                        default_config['adapter'] = trimmomatic_config['adapter_type']
                 logger.info(f"已加载配置文件: {config_file}")
         except Exception as e:
             logger.warning(f"加载配置文件失败: {e}，使用默认配置")

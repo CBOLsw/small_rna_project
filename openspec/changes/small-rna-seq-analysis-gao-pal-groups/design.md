@@ -34,6 +34,7 @@
 **决策**: 使用FastQC进行质量评估，Trimmomatic进行质量修剪和接头去除
 **理由**: FastQC是行业标准质量评估工具，Trimmomatic支持灵活的参数设置
 **备选方案**: Cutadapt - 功能类似，但Trimmomatic在接头去除方面更成熟
+**重要优化**: 根据VAHTS Small RNA Library Prep Kit for Illumina V2文库结构，专门优化了接头序列配置，添加了`vahts_small_rna_v2`接头类型，接头序列为`AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC`，并创建了对应的接头序列文件`config/VAHTS-SmallRNA-V2.fa`
 
 ### 3. 序列比对工具
 **决策**: 使用Bowtie2进行序列比对

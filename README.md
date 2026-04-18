@@ -43,25 +43,24 @@ chmod +x install_everything.sh
 4. 下载参考基因组（如果不存在）
 5. 安装完整分析环境（Conda + R包）
 
-### 手动下载参考资源（如果自动下载慢）
+### 手动下载参考资源（推荐使用WSL2下载）
 
-如果自动下载太慢，可以手动下载以下文件并放到指定目录：
+**重要提示**：经测试，所有国内镜像源（清华大学、中国科学技术大学、北京外国语大学）都返回404错误，无法使用。请使用以下官方源：
 
 #### 1. hg38参考基因组序列
+**唯一可用源：UCSC官方源**
 - **下载地址**：https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
-- **备用地址**：https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc.fa.gz
 - **目标文件**：`references/hg38.fa`
 - **操作步骤**：
   ```bash
-  # 下载并解压
   cd references
   wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
   gunzip hg38.fa.gz
   ```
 
 #### 2. hg38基因注释文件
+**唯一可用源：UCSC官方源**
 - **下载地址**：https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz
-- **备用地址**：https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/GCA_000001405.15_GRCh38_genomic.gff.gz
 - **目标文件**：`references/hg38.gtf`
 - **操作步骤**：
   ```bash
@@ -83,7 +82,7 @@ chmod +x install_everything.sh
   ```
 
 #### 4. 测序数据文件（必须）
-将您的12个fastq.gz测序文件放到：
+将您的fastq.gz测序文件放到：
 - **目标目录**：`data/raw_fastq/fastq_files/`
 
 **示例文件名**：
@@ -175,6 +174,95 @@ small_rna_project/
 - `results/differential_expression/` - 差异表达分析结果
 - `results/motif_analysis/` - Motif发现结果
 
+## 超参数配置指南
+
+本项目的所有超参数都可以在 `config/config.yaml` 文件中进行修改。以下是详细的参数说明：
+
+### 1. 样本信息配置
+| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
+|------|--------|-----------------|------|----------|
+| 元数据文件 | `data/metadata/sample_info.csv` | `data/metadata/new_samples.csv` | 样本信息CSV文件路径 | `samples.metadata_file` |
+| 分组列名 | `group` | `condition`, `treatment` | 样本分组的列名 | `samples.group_column` |
+| 样本列名 | `sample` | `sample_id`, `id` | 样本ID的列名 | `samples.sample_column` |
+| 分组列表 | `["GAO", "PAL"]` | `["Control", "Treatment"]`, `["WT", "KO"]` | 比较的实验组名称 | `samples.groups` |
+
+### 2. 参考基因组配置
+| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
+|------|--------|-----------------|------|----------|
+| 参考基因组序列 | `references/hg38.fa` | `references/mm10.fa`, `references/rn6.fa` | hg38参考基因组FASTA文件 | `reference.genome_fasta` |
+| Bowtie2索引 | `references/bowtie2_index/hg38` | `references/bowtie2_index/mm10` | Bowtie2索引前缀 | `reference.bowtie2_index` |
+| 基因注释文件 | `references/hg38.gtf` | `references/mm10.gtf`, `references/rn6.gtf` | GTF格式基因注释 | `reference.gtf_annotation` |
+
+### 3. 质量控制参数
+| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
+|------|--------|-----------------|------|----------|
+| Trimmomatic线程数 | 4 | `2`, `8`, `16` | 并行处理线程数 | `quality_control.trimmomatic.threads` |
+| 前端质量阈值 | 3 | `2`, `5`, `10` | 切除5'端低于此质量的碱基 | `quality_control.trimmomatic.leading` |
+| 末端质量阈值 | 3 | `2`, `5`, `10` | 切除3'端低于此质量的碱基 | `quality_control.trimmomatic.trailing` |
+| 滑动窗口 | `4:15` | `3:10`, `5:20` | 窗口大小:平均质量阈值 | `quality_control.trimmomatic.slidingwindow` |
+| 最小序列长度 | 18 | `15`, `20`, `25` | 保留的最短序列长度 | `quality_control.trimmomatic.minlen` |
+
+### 4. 序列比对参数
+| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
+|------|--------|-----------------|------|----------|
+| Bowtie2线程数 | 8 | `4`, `12`, `16` | 比对线程数 | `alignment.bowtie2.threads` |
+| 比对模式 | `very-sensitive-local` | `sensitive-local`, `very-fast-local` | 比对预设模式 | `alignment.bowtie2.preset` |
+| 种子长度 | 15 | `10`, `20` | 种子序列长度 | `alignment.bowtie2.seed_length` |
+| 最大错配数 | 1 | `0`, `2` | 允许的最大错配数 | `alignment.bowtie2.max_mismatches` |
+| 报告比对数 | 10 | `5`, `20` | 最多报告的比对位置数 | `alignment.bowtie2.k` |
+
+### 5. 基因计数参数
+| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
+|------|--------|-----------------|------|----------|
+| featureCounts线程数 | 8 | `4`, `12`, `16` | 计数线程数 | `counting.featureCounts.threads` |
+| 链特异性 | 0 | `1`, `2` | 0=无链,1=有链,2=反向链 | `counting.featureCounts.strandness` |
+| 最小重叠 | 1 | `5`, `10`, `20` | 最小重叠碱基数 | `counting.featureCounts.min_overlap` |
+| 多重比对计数 | false | `true` | 是否计数多重比对序列 | `counting.featureCounts.count_multi_mapping` |
+
+### 6. 差异表达分析参数
+| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
+|------|--------|-----------------|------|----------|
+| 调整p值阈值 | 0.05 | `0.01`, `0.1` | 差异表达显著性阈值 | `differential_expression.deseq2.padj_threshold` |
+| log2倍数变化阈值 | 1.0 | `0.5`, `1.5`, `2.0` | 表达变化倍数阈值 | `differential_expression.deseq2.log2fc_threshold` |
+| 收缩效应 | true | `false` | 是否使用效应量收缩 | `differential_expression.deseq2.shrinkage` |
+
+### 7. Motif分析参数
+| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
+|------|--------|-----------------|------|----------|
+| 最小motif宽度 | 6 | `4`, `8` | 最短motif长度 | `motif_analysis.meme.min_width` |
+| 最大motif宽度 | 12 | `10`, `15`, `20` | 最长motif长度 | `motif_analysis.meme.max_width` |
+| 最大motif数 | 10 | `5`, `20`, `50` | 最多发现的motif数量 | `motif_analysis.meme.max_motifs` |
+| E-value阈值 | 1e-4 | `1e-3`, `1e-5` | Motif显著性阈值 | `motif_analysis.meme.evalue_threshold` |
+| MEME线程数 | 8 | `4`, `12`, `16` | Motif分析线程数 | `motif_analysis.meme.threads` |
+| Tomtom数据库 | `JASPAR_vertebrates` | `HOCOMOCOv11_core`, `UNIPROBE` | Motif比对数据库 | `motif_analysis.tomtom.database` |
+
+### 8. 执行参数
+| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
+|------|--------|-----------------|------|----------|
+| Snakemake核心数 | 8 | `4`, `12`, `16`, `all` | 并行执行的最大核心数 | `snakemake.cores` |
+| 等待时间 | 60 | `30`, `120`, `300` | 文件生成等待时间(秒) | `snakemake.latency_wait` |
+| 重试次数 | 2 | `1`, `3`, `5` | 失败任务重试次数 | `snakemake.restart_times` |
+| 出错继续 | true | `false` | 某个任务失败时是否继续 | `snakemake.keep_going` |
+
+### 9. 可视化参数
+| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
+|------|--------|-----------------|------|----------|
+| 图片DPI | 300 | `150`, `600` | 输出图片分辨率 | `visualization.dpi` |
+| 图片格式 | `png` | `pdf`, `svg`, `jpg` | 输出图片格式 | `visualization.figure_format` |
+| 颜色方案 | `Set2` | `viridis`, `Paired`, `tab10` | 绘图颜色调色板 | `visualization.color_palette` |
+
+### 配置文件修改示例
+
+如需修改参数，编辑 `config/config.yaml` 文件：
+
+```yaml
+# 示例：修改差异表达分析阈值
+differential_expression:
+  deseq2:
+    padj_threshold: 0.01        # 将显著性阈值改为0.01
+    log2fc_threshold: 1.5        # 将倍数变化阈值改为1.5
+```
+
 ## 技术实现细节
 
 ### 关键参数设置
@@ -185,7 +273,7 @@ small_rna_project/
 
 ### 分析统计阈值
 - 差异表达基因筛选：padj < 0.05，|log2FC| > 1.0
-- Motif显著性：E-value < 10
+- Motif显著性：E-value < 1e-4
 
 ## 常见问题
 
