@@ -50,6 +50,14 @@ for pkg in "${!BIOC_PACKAGES[@]}"; do
     echo ""
 done
 
+# 安装DESeq2
+echo "正在安装DESeq2..."
+R -e "options(BioC_mirror='https://mirrors.tuna.tsinghua.edu.cn/bioconductor'); if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager'); BiocManager::install('DESeq2', ask=FALSE)" 2>&1 | tail -10
+
+# 安装其他必要的Bioconductor包
+echo "正在安装其他Bioconductor包..."
+R -e "options(BioC_mirror='https://mirrors.tuna.tsinghua.edu.cn/bioconductor'); if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager'); BiocManager::install(c('GenomicRanges', 'IRanges', 'SummarizedExperiment'), ask=FALSE)" 2>&1 | tail -10
+
 # 清理
 cd - > /dev/null || exit 1
 rm -rf "$DOWNLOAD_DIR"

@@ -44,7 +44,7 @@
 ## 数据准备状态
 
 ### 原始数据
-- ✅ 已准备13个fastq.gz文件，位置：`data/raw_fastq/fastq_files/`
+- ✅ 已准备12个fastq.gz文件，位置：`data/raw_fastq/fastq_files/`
 - ✅ 样本信息已配置：`data/metadata/sample_info.csv`
 
 样本列表：
@@ -108,7 +108,7 @@ cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
 # 2. 给所有脚本添加执行权限
 chmod +x setup_complete.sh install_bioc_packages.sh
 
-# 3. 运行一键安装（预计30-45分钟）
+# 3. 运行一键安装（预计20-30分钟，避免bioconductor-data-packages卡住）
 ./setup_complete.sh
 ```
 
@@ -144,21 +144,22 @@ message("  - CRAN: https://mirrors.tuna.tsinghua.edu.cn/CRAN/")
 EOFR
 ```
 
-#### 第二步：创建并激活环境
+#### 第二步：创建核心环境（不含bioconductor-data-packages）
 ```bash
 # 安装mamba（如果没有）
 conda install -y -c conda-forge mamba
 
-# 创建conda环境
-mamba env create -f envs/small_rna_analysis.yaml
+# 创建核心conda环境（关键：避免bioconductor-data-packages自动下载卡住）
+mamba env create -f envs/small_rna_analysis_core.yaml
 
 # 激活环境
 conda activate small_rna_analysis
 ```
 
-#### 第三步：安装Bioconductor数据包
+#### 第三步：安装Bioconductor数据包（使用专门脚本）
 ```bash
 # 运行专门的Bioconductor包安装脚本（解决GenomeInfoDbData下载慢问题）
+# 这个脚本会从清华镜像快速下载所有大包并安装
 ./install_bioc_packages.sh
 ```
 

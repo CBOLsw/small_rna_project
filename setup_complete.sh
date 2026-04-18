@@ -109,15 +109,38 @@ export R_PROFILE_USER="$HOME/.Rprofile"
 export BIOCONDUCTOR_MIRROR="https://mirrors.tuna.tsinghua.edu.cn/bioconductor"
 export R_REPOSITORIES="https://mirrors.tuna.tsinghua.edu.cn/CRAN/"
 
+# 预下载Bioconductor大包（使用清华镜像）
+echo "预下载Bioconductor数据包..."
+mkdir -p /tmp/bioc_packages
+cd /tmp/bioc_packages
+
+# 下载GenomeInfoDbData（如果还没有）
+if [ ! -f "GenomeInfoDbData_1.2.11.tar.gz" ]; then
+    echo "正在下载GenomeInfoDbData（从清华镜像）..."
+    wget -q "https://mirrors.tuna.tsinghua.edu.cn/bioconductor/packages/3.18/data/annotation/src/contrib/GenomeInfoDbData_1.2.11.tar.gz" || true
+fi
+cd - > /dev/null
+
 # 执行环境创建，显示完整输出
-mamba env create -f envs/small_rna_analysis.yaml
+echo "正在创建核心conda环境（不含bioconductor-data-packages）..."
+mamba env create -f envs/small_rna_analysis_core.yaml
 
 if [ $? -eq 0 ]; then
-    echo "环境创建完成"
+    echo "核心环境创建完成"
 
     # 激活环境并配置R镜像源
     eval "$(conda shell.bash hook)"
     conda activate small_rna_analysis
+
+    # 如果预下载成功，手动安装GenomeInfoDbData
+    if [ -f "/tmp/bioc_packages/GenomeInfoDbData_1.2.11.tar.gz" ]; then
+        echo "手动安装GenomeInfoDbData..."
+        R -e "install.packages('/tmp/bioc_packages/GenomeInfoDbData_1.2.11.tar.gz', repos = NULL, type = 'source')" 2>&1
+    fi
+
+    # 安装DESeq2和其他Bioconductor包
+    echo "正在安装Bioconductor包..."
+    ./install_bioc_packages.sh
 
     # 在conda环境中创建.Rprofile文件
     R_PROFILE_PATH="$CONDA_PREFIX/.Rprofile"
