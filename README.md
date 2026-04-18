@@ -97,17 +97,106 @@
 - 优点: 不需要额外环境
 - 缺点: 配置复杂，部分工具不可用
 
-## 快速开始（Linux环境）
+## 完整环境配置流程（推荐WSL2/Linux）
 
-### 1. 环境设置
+### 方案一：一键安装（快速推荐）
 
 ```bash
+# 1. 进入项目目录
+cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
+
+# 2. 给所有脚本添加执行权限
+chmod +x setup_complete.sh install_bioc_packages.sh
+
+# 3. 运行一键安装（预计30-45分钟）
+./setup_complete.sh
+```
+
+### 方案二：手动分步安装（用于调试）
+
+#### 第一步：配置镜像源
+```bash
+# 配置conda镜像源（清华源）
+cat > ~/.condarc << 'EOF'
+channels:
+  - defaults
+show_channel_urls: true
+default_channels:
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2
+custom_channels:
+  conda-forge: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  bioconda: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  menpo: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  pytorch: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  simpleitk: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+EOF
+
+# 配置R镜像源
+mkdir -p ~/.R
+cat > ~/.Rprofile << 'EOFR'
+options(BioC_mirror = "https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
+options(repos = c(CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
+message("已配置使用清华镜像源:")
+message("  - Bioconductor: https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
+message("  - CRAN: https://mirrors.tuna.tsinghua.edu.cn/CRAN/")
+EOFR
+```
+
+#### 第二步：创建并激活环境
+```bash
+# 安装mamba（如果没有）
+conda install -y -c conda-forge mamba
+
 # 创建conda环境
-conda env create -f envs/small_rna_analysis.yaml
+mamba env create -f envs/small_rna_analysis.yaml
+
+# 激活环境
 conda activate small_rna_analysis
 ```
 
-### 2. 构建Bowtie2索引
+#### 第三步：安装Bioconductor数据包
+```bash
+# 运行专门的Bioconductor包安装脚本（解决GenomeInfoDbData下载慢问题）
+./install_bioc_packages.sh
+```
+
+#### 第四步：安装系统依赖（WSL2）
+```bash
+sudo apt-get update && sudo apt-get install -y fastqc samtools bowtie2 trimmomatic
+```
+
+### 验证安装
+
+```bash
+# 检查环境是否激活
+conda env list
+which python
+python --version
+which R
+R --version
+
+# 检查关键工具
+which fastqc
+which bowtie2
+which samtools
+which meme
+which snakemake
+
+# 检查R包
+R -e "library(DESeq2); print('DESeq2 loaded')"
+R -e "library(GenomeInfoDbData); print('GenomeInfoDbData loaded')"
+
+# 检查Python包
+python -c "import Bio; print('Biopython loaded')"
+python -c "import pysam; print('pysam loaded')"
+python -c "import pandas as pd; print('pandas loaded')"
+```
+
+### 运行分析流程
+
+#### 步骤一：构建Bowtie2索引
 
 ```bash
 python scripts/alignment/build_bowtie2_index.py \
@@ -116,14 +205,30 @@ python scripts/alignment/build_bowtie2_index.py \
   --threads 4
 ```
 
-### 3. 运行完整流程
+#### 步骤二：运行完整流程
 
 ```bash
-# 使用Python脚本
+# 使用Python脚本（推荐）
 python scripts/run_pipeline.py --config config/config.yaml --cores 8
 
 # 或使用Snakemake
 snakemake --cores 8 --configfile config/config.yaml
+```
+
+### 模块级运行（可选）
+
+```bash
+# 仅运行质量控制
+python scripts/run_pipeline.py --config config/config.yaml --module qc
+
+# 仅运行序列比对
+python scripts/run_pipeline.py --config config/config.yaml --module alignment
+
+# 仅运行差异表达分析
+python scripts/run_pipeline.py --config config/config.yaml --module de
+
+# 查看流程状态
+python scripts/run_pipeline.py --config config/config.yaml --status
 ```
 
 ## 已完成工作
@@ -147,15 +252,74 @@ snakemake --cores 8 --configfile config/config.yaml
 - ✅ 配置文件和流程定义已准备
 - ✅ Dockerfile已创建
 
+## 常见问题解决
+
+### 问题1：Bioconductor数据包下载慢或卡住
+
+**症状**：安装GenomeInfoDbData等大包时，下载速度极慢或直接卡住
+
+**原因**：bioconductor-data-packages的安装脚本使用硬编码的官方URL，绕过了镜像源配置
+
+**解决方案**：
+```bash
+# 方法一：使用专门的Bioconductor安装脚本（推荐）
+conda activate small_rna_analysis
+./install_bioc_packages.sh
+
+# 方法二：直接在R中使用清华镜像安装
+R -e "options(BioC_mirror='https://mirrors.tuna.tsinghua.edu.cn/bioconductor'); if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager'); BiocManager::install('GenomeInfoDbData', ask=FALSE, force=TRUE)"
+
+# 方法三：手动下载并安装
+cd /tmp
+wget https://mirrors.tuna.tsinghua.edu.cn/bioconductor/packages/3.18/data/annotation/src/contrib/GenomeInfoDbData_1.2.11.tar.gz
+R -e "install.packages('/tmp/GenomeInfoDbData_1.2.11.tar.gz', repos = NULL, type = 'source')"
+```
+
+### 问题2：conda环境未激活
+
+**症状**：运行脚本时提示找不到命令
+
+**解决方案**：
+```bash
+# 检查环境列表
+conda env list
+
+# 激活环境
+conda activate small_rna_analysis
+
+# 如果激活失败，检查是否已初始化
+conda init bash
+```
+
+### 问题3：系统依赖未安装
+
+**症状**：fastqc、bowtie2等工具找不到
+
+**解决方案**：
+```bash
+# 在WSL2中安装
+sudo apt-get update && sudo apt-get install -y fastqc samtools bowtie2 trimmomatic
+```
+
+### 问题4：内存不足
+
+**症状**：比对或DESeq2分析时崩溃
+
+**解决方案**：
+- 减少使用的核心数：`--cores 4` 而不是 `--cores 8`
+- 关闭其他内存占用大的程序
+- 在WSL2中调整内存限制：编辑`.wslconfig`文件
+
 ## 文档索引
 
-- `docs/environment_setup.md` - **完整环境配置指南**（新增）
-- `setup_complete.sh` - **一键环境安装脚本**（新增）
-- `docs/user_guide.md` - 详细使用指南
+- `USAGE_INSTRUCTIONS.md` - **完整使用说明**（必读）
+- `setup_complete.sh` - **一键环境安装脚本**（推荐）
+- `install_bioc_packages.sh` - **Bioconductor数据包快速安装脚本**
+- `docs/environment_setup.md` - 完整环境配置详解
+- `docs/wsl_setup_guide.md` - WSL2详细配置指南
 - `docs/technical_manual.md` - 技术实现细节
 - `config/config.yaml` - 分析参数配置
 - `envs/small_rna_analysis.yaml` - Conda环境配置
-- `envs/small_rna_analysis_windows.yaml` - Windows兼容环境配置
 - `openspec/changes/small-rna-seq-analysis-gao-pal-groups/tasks.md` - 完整任务列表
 
 ## 注意事项
