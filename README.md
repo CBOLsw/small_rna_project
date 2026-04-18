@@ -39,12 +39,18 @@ chmod +x scripts/setup/install_everything.sh
 ```
 
 **脚本会自动执行：**
-1. 检查系统环境和conda安装
-2. 创建项目目录结构
-3. 检查并下载参考基因组（如果不存在）
-4. 创建并配置conda环境
-5. 安装Bioconductor包
-6. 检查项目状态
+1. 检查系统环境和conda版本（如果发现Windows conda会提示用户）
+2. 自动安装Linux版Miniconda（如果需要）
+3. 创建项目目录结构
+4. 检查并下载参考基因组（如果不存在）
+5. 创建并配置conda环境
+6. 安装Bioconductor包
+7. 检查项目状态
+
+**安全机制：**
+- 自动检测并警告Windows conda
+- 提供选择：继续或安装Linux版conda
+- 默认推荐使用Linux版conda以确保工具正常工作
 
 ---
 

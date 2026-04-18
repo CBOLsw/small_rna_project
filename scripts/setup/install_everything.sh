@@ -69,8 +69,46 @@ else
     exit 1
 fi
 
+# 检查conda环境
+print_step "2/5" "检查conda环境"
+if command -v conda &> /dev/null; then
+    # 检查conda是否为WSL2版本
+    if [ "$(which conda)" = "/mnt/c/Users/24584/miniconda3/Scripts/conda.exe" ] || [[ "$(which conda)" == *".exe" ]]; then
+        print_error "发现Windows版本的conda（conda.exe）"
+        print_error "这会导致安装的工具无法在WSL2中正常运行"
+        echo ""
+        print_info "解决方案："
+        print_info "  1. 继续安装，但可能会失败"
+        print_info "  2. 先安装Linux版conda（推荐）"
+        print_info ""
+        read -p "是否继续使用Windows conda？(y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_info "正在为您安装Linux版Miniconda..."
+            cd ~
+            wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+            bash miniconda.sh -b -p $HOME/miniconda
+            export PATH="$HOME/miniconda/bin:$PATH"
+            eval "$($HOME/miniconda/bin/conda shell.bash hook)"
+            conda init bash
+            print_success "Linux版Miniconda安装成功"
+        fi
+    else
+        print_success "检测到WSL2/Linux版conda"
+    fi
+else
+    print_info "未找到conda，正在安装Linux版Miniconda..."
+    cd ~
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+    bash miniconda.sh -b -p $HOME/miniconda
+    export PATH="$HOME/miniconda/bin:$PATH"
+    eval "$($HOME/miniconda/bin/conda shell.bash hook)"
+    conda init bash
+    print_success "Miniconda安装成功"
+fi
+
 # 创建必要的目录
-print_step "2/5" "创建项目目录结构"
+print_step "3/6" "创建项目目录结构"
 mkdir -p data/raw_fastq/fastq_files
 mkdir -p data/metadata
 mkdir -p references/bowtie2_index
@@ -83,7 +121,7 @@ mkdir -p logs
 print_success "目录结构创建完成"
 
 # 检查数据
-print_step "3/5" "检查数据文件"
+print_step "4/6" "检查数据文件"
 SAMPLE_CSV="data/metadata/sample_info.csv"
 if [ -f "$SAMPLE_CSV" ]; then
     print_success "样本信息文件存在: $SAMPLE_CSV"
@@ -104,7 +142,7 @@ else
 fi
 
 # 下载参考基因组
-print_step "4/5" "下载参考基因组 (可能需要30-60分钟)"
+print_step "5/6" "下载参考基因组 (可能需要30-60分钟)"
 if [ -f "references/hg38.fa" ] && [ -f "references/hg38.gtf" ]; then
     print_success "参考基因组已存在，跳过下载"
 else
@@ -120,7 +158,7 @@ else
 fi
 
 # 安装conda环境
-print_step "5/5" "安装分析环境 (可能需要30-45分钟)"
+print_step "6/6" "安装分析环境 (可能需要30-45分钟)"
 if conda env list | grep -q "small_rna_analysis"; then
     print_warning "conda环境已存在"
     read -p "是否重新安装？(y/N): " -n 1 -r
