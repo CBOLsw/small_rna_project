@@ -201,6 +201,7 @@ def get_available_modules() -> Dict[str, str]:
     """获取可用的模块列表"""
     return {
         'all': '运行完整分析流程',
+        'check': '仅运行项目状态检查',
         'qc': '仅运行数据质量控制模块',
         'alignment': '仅运行序列比对模块',
         'counts': '仅运行基因计数模块',
@@ -218,6 +219,10 @@ def main():
 使用示例:
   # 运行完整流程
   python scripts/run_pipeline.py --config config/config.yaml
+
+  # 运行项目状态检查
+  python scripts/run_pipeline.py --config config/config.yaml --check
+  python scripts/run_pipeline.py --config config/config.yaml --module check
 
   # 仅运行质量控制模块
   python scripts/run_pipeline.py --config config/config.yaml --module qc
@@ -248,6 +253,8 @@ def main():
     # 状态查询
     parser.add_argument('--status', action='store_true',
                        help='检查当前流程状态')
+    parser.add_argument('--check', action='store_true',
+                       help='运行项目状态检查')
 
     # 执行参数
     parser.add_argument('--cores', type=int,
@@ -289,8 +296,22 @@ def main():
         check_pipeline_status(config)
         return 0
 
+    # 处理项目状态检查请求
+    if args.check:
+        logger.info("运行项目状态检查")
+        check_command = ['python', 'scripts/utils/final_check.py']
+        result = subprocess.run(check_command, capture_output=True, text=True)
+        if result.returncode == 0:
+            logger.info("项目状态检查通过")
+            logger.info(result.stdout)
+        else:
+            logger.error("项目状态检查失败")
+            logger.error(result.stderr)
+        return result.returncode
+
     # 确定目标
     target_map = {
+        'check': os.path.join(config['directories']['logs'], '.project_check_complete'),
         'qc': os.path.join(config['directories']['results'], 'qc', 'qc_summary.csv'),
         'alignment': os.path.join(config['directories']['results'], 'alignment', 'alignment_summary.csv'),
         'counts': os.path.join(config['directories']['results'], 'counts', 'counts_summary.csv'),

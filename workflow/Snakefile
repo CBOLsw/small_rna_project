@@ -416,5 +416,20 @@ rule create_directories:
         touch {output}
         """
 
+
+# ==================== 项目状态检查 ====================
+
+rule project_check:
+    """项目状态检查"""
+    output:
+        os.path.join(config["directories"]["logs"], ".project_check_complete")
+    log:
+        os.path.join(LOG_DIR, "project_check.log")
+    shell:
+        """
+        python scripts/utils/final_check.py 2>&1 | tee {log}
+        touch {output}
+        """
+
 # 设置目录创建规则在其他规则之前运行
 # 注意：直接在规则中显式定义依赖关系

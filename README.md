@@ -30,10 +30,10 @@
 cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
 
 # 2. 给安装脚本添加执行权限
-chmod +x install_everything.sh
+chmod +x scripts/setup/install_everything.sh
 
 # 3. 运行一键安装（预计45-60分钟）
-./install_everything.sh
+./scripts/setup/install_everything.sh
 ```
 
 **脚本会自动执行：**
@@ -148,7 +148,14 @@ small_rna_project/
 │   ├── qc/                          # 质量控制脚本
 │   ├── alignment/                  # 序列比对脚本
 │   ├── expression/                 # 基因表达分析脚本
-│   └── motif/                      # Motif分析脚本
+│   ├── motif/                      # Motif分析脚本
+│   ├── setup/                      # 环境设置和工具下载脚本
+│   │   ├── install_everything.sh    # 一键安装脚本
+│   │   ├── install_bioc_packages.sh # R包安装脚本
+│   │   ├── setup_complete.sh        # 完成设置脚本
+│   └── utils/                      # 工具和辅助脚本
+│       ├── download_references.py   # 参考基因组下载脚本
+│       └── final_check.py           # 项目状态检查脚本
 ├── workflow/                        # Snakemake流程定义
 ├── config/                          # 配置文件
 ├── envs/                           # Conda环境配置
@@ -159,7 +166,6 @@ small_rna_project/
 │   ├── differential_expression/
 │   └── motif_analysis/
 ├── logs/                          # 运行日志
-└── install_everything.sh         # 一键安装脚本
 ```
 
 ## 结果输出
@@ -274,6 +280,16 @@ differential_expression:
 - Motif显著性：E-value < 1e-4
 
 ## 常见问题
+
+### 问：如何检查项目状态和配置？
+
+```bash
+# 运行项目状态检查，确认配置正确
+python scripts/utils/final_check.py
+
+# 或者通过流程执行脚本检查
+python scripts/run_pipeline.py --config config/config.yaml --check
+```
 
 ### 问：如何运行分析？
 
