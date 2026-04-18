@@ -151,8 +151,7 @@ rule build_bowtie2_index:
         """
         python scripts/alignment/build_bowtie2_index.py \
             --genome {input.fasta} \
-            --output references/bowtie2_index \
-            --prefix hg38 \
+            --output references/bowtie2_index/hg38 \
             2>&1 | tee {log}
         """
 
