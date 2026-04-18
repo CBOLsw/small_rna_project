@@ -483,13 +483,13 @@ def parse_arguments():
     parser.add_argument(
         "--input", "-i",
         required=True,
-        help="输入文件或目录，或样本信息CSV文件"
+        help="输入fastq文件"
     )
 
     parser.add_argument(
         "--output", "-o",
-        default="data/processed/trimmed",
-        help="输出目录 (默认: data/processed/trimmed)"
+        required=True,
+        help="输出文件路径"
     )
 
     parser.add_argument(
@@ -498,21 +498,10 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "--sample-info",
-        help="样本信息CSV文件，包含fastq_r1和fastq_r2列"
-    )
-
-    parser.add_argument(
         "--threads", "-t",
         type=int,
         default=4,
         help="线程数 (默认: 4)"
-    )
-
-    parser.add_argument(
-        "--summary",
-        action="store_true",
-        help="生成汇总报告"
     )
 
     return parser.parse_args()
@@ -537,66 +526,36 @@ def main():
         logger.error("Trimmomatic检查失败，请确保Trimmomatic和Java已安装")
         sys.exit(1)
 
-    # 处理输入
+    # 简单处理单个文件
     input_path = Path(args.input)
-    output_dir = Path(args.output)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # 根据输入类型处理
-    if args.sample_info:
-        # 使用样本信息CSV文件
-        logger.info(f"使用样本信息文件: {args.sample_info}")
-        df = pd.read_csv(args.sample_info)
+    # 提取样本名
+    sample_name = input_path.stem
+    if sample_name.endswith('.fastq') or sample_name.endswith('.fq'):
+        sample_name = sample_name[:-6]
+    if sample_name.endswith('_R1') or sample_name.endswith('_R2'):
+        sample_name = sample_name[:-3]
 
-        for _, row in df.iterrows():
-            sample = row.get('sample', f"sample_{_}")
-            fastq_r1 = row.get('fastq_r1')
-            fastq_r2 = row.get('fastq_r2')
+    # 执行修剪
+    result = processor.trim_single_end(
+        input_file=str(input_path),
+        output_dir=str(output_path.parent),
+        sample_name=sample_name,
+        config=config
+    )
 
-            if pd.notna(fastq_r1) and pd.notna(fastq_r2):
-                # 双端数据
-                processor.trim_paired_end(
-                    input_r1=fastq_r1,
-                    input_r2=fastq_r2,
-                    output_dir=output_dir,
-                    sample_name=sample,
-                    config=config
-                )
-            elif pd.notna(fastq_r1):
-                # 单端数据
-                processor.trim_single_end(
-                    input_file=fastq_r1,
-                    output_dir=output_dir,
-                    sample_name=sample,
-                    config=config
-                )
-
-    elif input_path.is_file() and input_path.suffix in ['.fastq', '.fq', '.fastq.gz', '.fq.gz']:
-        # 单个fastq文件
-        sample_name = input_path.stem
-        if sample_name.endswith('.fastq') or sample_name.endswith('.fq'):
-            sample_name = sample_name[:-6]
-        if sample_name.endswith('_R1') or sample_name.endswith('_R2'):
-            sample_name = sample_name[:-3]
-
-        processor.trim_single_end(
-            input_file=str(input_path),
-            output_dir=output_dir,
-            sample_name=sample_name,
-            config=config
-        )
-
+    # 检查结果并移动文件到指定输出位置
+    if result.get('success'):
+        original_output = Path(result['output_file'])
+        if original_output != output_path:
+            import shutil
+            shutil.move(str(original_output), str(output_path))
+            logger.info(f"已将输出文件移动到: {output_path}")
     else:
-        logger.error("不支持的输入类型，请提供样本信息CSV或fastq文件")
+        logger.error("Trimmomatic处理失败")
         sys.exit(1)
-
-    # 生成汇总报告
-    if args.summary or True:  # 默认总是生成汇总
-        report_file = processor.generate_summary(output_dir)
-        if report_file:
-            logger.info(f"处理完成，报告文件: {report_file}")
-        else:
-            logger.warning("未能生成汇总报告")
 
     logger.info("Trimmomatic处理流程完成")
 
