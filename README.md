@@ -99,26 +99,15 @@ ls -lh references/
 ls -lh data/raw_fastq/fastq_files/
 ```
 
-## WSL2环境配置问题
+## WSL2中配置项目环境
 
-**重要提示：如果您遇到以下问题，请检查您的conda环境是否正确配置**
+**说明：本章节仅在您遇到以下问题时使用**
 
-### 常见问题
+- trimmomatic无法找到或安装失败
+- 使用了Windows的conda导致的conda环境
+- 在WSL2中看到Windows的conda环境
 
-#### 1. trimmomatic无法找到或安装失败
-
-**问题现象：**
-- `Error: Unable to access jarfile trimmomatic`
-- `conda install trimmomatic` 失败
-- `conda list trimmomatic` 无输出
-
-**原因分析：**
-- 您可能在WSL2中使用了Windows的conda（路径包含`/e/Anaconda`或Windows驱动器路径）
-- Windows的conda包和WSL2的包兼容性问题
-
-**解决方案：**
-
-**方案1：在WSL2中安装Linux版Miniconda（推荐）**
+**方案1：在WSL2中安装Linux版Miniconda（推荐）
 
 ```bash
 # 1. 在WSL2中下载并安装Linux版Miniconda
