@@ -99,6 +99,97 @@ ls -lh references/
 ls -lh data/raw_fastq/fastq_files/
 ```
 
+## 安装完成后的分析流程操作
+
+### 1. 激活分析环境
+
+```bash
+# 激活conda环境
+conda activate small_rna_analysis
+
+# 验证环境激活成功
+conda info --envs
+```
+
+### 2. 检查项目状态
+
+```bash
+# 运行项目状态检查，确保所有配置正确
+python scripts/run_pipeline.py --config config/config.yaml --check
+
+# 或者运行更详细的状态检查
+python scripts/utils/final_check.py
+```
+
+### 3. 查看分析步骤（Dry-run模式）
+
+```bash
+# 查看将要执行的步骤，不实际运行
+python scripts/run_pipeline.py --config config/config.yaml --dry-run
+```
+
+### 4. 运行完整分析流程
+
+```bash
+# 使用默认配置运行完整分析（推荐8个CPU核心）
+python scripts/run_pipeline.py --config config/config.yaml
+
+# 或者指定更多CPU核心加速分析
+python scripts/run_pipeline.py --config config/config.yaml --cores 16
+
+# 保存日志到文件
+python scripts/run_pipeline.py --config config/config.yaml --log-file logs/analysis.log
+```
+
+### 5. 分模块运行分析
+
+如果需要分步运行分析：
+
+```bash
+# 仅运行数据质量控制
+python scripts/run_pipeline.py --config config/config.yaml --module qc
+
+# 仅运行序列比对
+python scripts/run_pipeline.py --config config/config.yaml --module alignment
+
+# 仅运行基因计数
+python scripts/run_pipeline.py --config config/config.yaml --module counts
+
+# 仅运行差异表达分析
+python scripts/run_pipeline.py --config config/config.yaml --module de
+
+# 仅运行Motif分析
+python scripts/run_pipeline.py --config config/config.yaml --module motif
+```
+
+### 6. 从失败处恢复执行
+
+如果分析过程中出现中断：
+
+```bash
+# 从上次失败的步骤恢复执行
+python scripts/run_pipeline.py --config config/config.yaml --resume
+```
+
+### 7. 检查分析结果
+
+```bash
+# 查看生成的结果文件
+ls -lh results/
+ls -lh results/qc/
+ls -lh results/alignment/
+ls -lh results/counts/
+ls -lh results/differential_expression/
+ls -lh results/motif_analysis/
+```
+
+### 8. 查看分析状态
+
+```bash
+# 检查当前流程执行状态
+python scripts/run_pipeline.py --config config/config.yaml --status
+```
+
 ## 分析流程
 
 项目会自动执行以下分析步骤：
