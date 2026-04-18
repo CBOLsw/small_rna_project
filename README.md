@@ -25,6 +25,8 @@
 
 ### 一键安装（推荐）
 
+如果您是第一次使用：
+
 ```bash
 # 1. 进入项目目录
 cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
@@ -37,13 +39,34 @@ chmod +x scripts/setup/install_everything.sh
 ```
 
 **脚本会自动执行：**
-1. 检查系统环境
+1. 检查系统环境和conda安装
 2. 创建项目目录结构
-3. 检查数据文件
-4. 下载参考基因组（如果不存在）
-5. 安装完整分析环境（Conda + R包）
+3. 检查并下载参考基因组（如果不存在）
+4. 创建并配置conda环境
+5. 安装Bioconductor包
+6. 检查项目状态
 
-### 手动下载参考资源（推荐使用WSL2下载）
+### 手动操作流程（如果您已安装过环境）
+
+如果您已通过一键安装配置过环境，可直接执行以下步骤：
+
+```bash
+# 1. 激活环境
+conda activate small_rna_analysis
+
+# 2. 进入项目目录
+cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
+
+# 3. 检查项目状态
+python scripts/run_pipeline.py --config config/config.yaml --check
+
+# 4. 运行分析（使用8个CPU核心）
+python scripts/run_pipeline.py --config config/config.yaml --cores 8
+```
+
+---
+
+## 参考资源下载（如需手动更新）
 
 #### 1. hg38参考基因组序列
 **可用源：UCSC官方源**
@@ -97,95 +120,6 @@ HeLa-GAO2_S58_L004_R2_001.fastq.gz
 ```bash
 ls -lh references/
 ls -lh data/raw_fastq/fastq_files/
-```
-
-## 从零开始：完整操作流程（WSL2）
-
-以下是从开启WSL2到运行分析的完整、逻辑正确的操作步骤：
-
-### 第一步：开启WSL2并进入项目目录
-
-```bash
-# 1. 打开WSL2终端
-# （在Windows中按Win+R，输入wsl，回车）
-
-# 2. 进入项目目录
-cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
-
-# 3. 确认当前位置
-pwd
-# 应该显示：/mnt/c/Users/24584/PycharmProjects/small_rna_project
-```
-
-### 第二步：检查并安装Miniconda（如果需要）
-
-```bash
-# 1. 检查是否已安装conda
-which conda
-
-# 2. 如果没有安装（显示not found），安装Linux版Miniconda：
-cd ~
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-bash miniconda.sh -b -p $HOME/miniconda
-
-# 3. 初始化conda
-eval "$($HOME/miniconda/bin/conda shell.bash hook)"
-conda init bash
-
-# 4. 重新加载shell配置
-source ~/.bashrc
-
-# 5. 验证conda安装成功
-which conda
-# 应该显示：/home/你的用户名/miniconda/bin/conda
-```
-
-### 第三步：创建并激活项目环境
-
-```bash
-# 1. 回到项目目录
-cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
-
-# 2. 创建conda环境（预计15-30分钟）
-conda env create -f envs/small_rna_analysis.yaml
-
-# 3. 激活环境
-conda activate small_rna_analysis
-
-# 4. 验证环境
-conda info --envs
-# 应该看到 small_rna_analysis 环境被激活（前面有*号）
-```
-
-### 第四步：安装Bioconductor包
-
-```bash
-# 确保已激活small_rna_analysis环境，然后运行：
-chmod +x scripts/setup/install_bioc_packages.sh
-./scripts/setup/install_bioc_packages.sh
-```
-
-### 第五步：检查项目状态
-
-```bash
-# 1. 运行项目状态检查
-python scripts/run_pipeline.py --config config/config.yaml --check
-
-# 2. 确认所有检查通过
-```
-
-### 第六步：运行分析流程
-
-```bash
-# 1. 查看将要执行的步骤（Dry-run）
-python scripts/run_pipeline.py --config config/config.yaml --dry-run
-
-# 2. 运行完整分析（使用8个CPU核心）
-python scripts/run_pipeline.py --config config/config.yaml --cores 8
-
-# 或者使用一键安装脚本（包含以上所有步骤）：
-# chmod +x scripts/setup/install_everything.sh
-# ./scripts/setup/install_everything.sh
 ```
 
 ---
