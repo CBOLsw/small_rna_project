@@ -4,6 +4,23 @@
 
 这个项目用于分析GAO组和PAL组的HeLa细胞small RNA测序数据，通过生物信息学方法找出两组细胞之间的差异表达基因，并发现可能的基因调控模式。
 
+## 技术栈
+
+### 核心分析工具
+- **FastQC**: 测序数据质量评估
+- **Trimmomatic**: 测序数据修剪和过滤
+- **Bowtie2**: 序列比对工具（专门为small RNA优化）
+- **SAMtools**: BAM文件处理
+- **featureCounts**: 基因表达量计数
+- **DESeq2**: 差异表达分析（R语言包）
+- **MEME Suite**: 转录因子结合位点分析（motif发现）
+
+### 流程管理和编程
+- **Snakemake**: 工作流程管理
+- **Conda/Mamba**: 环境管理和包管理
+- **Python 3.9+**: 数据分析和脚本编写
+- **R 4.3+**: 统计分析和可视化
+
 ## 快速开始（推荐WSL2/Linux）
 
 ### 一键安装（最简单）
@@ -53,9 +70,41 @@ snakemake --cores 4 --configfile config/config.yaml
 - GAO组：GAO_1, GAO_2, GAO_3
 - PAL组：PAL_1, PAL_2, PAL_3
 
-### 参考基因组
+### 参考数据
 - hg38参考基因组：`references/hg38.fa`
 - hg38基因注释：`references/hg38.gtf`
+- Bowtie2索引：`references/bowtie2_index/`（运行时生成）
+
+## 项目依赖的配置文件
+
+- `config/config.yaml`: 分析流程参数配置
+- `envs/small_rna_analysis.yaml`: Conda环境配置
+
+## 项目目录详细说明
+
+```
+small_rna_project/
+├── data/
+│   ├── raw_fastq/            # 原始测序数据
+│   ├── processed/            # 处理后的中间数据
+│   └── metadata/             # 样本信息和分组信息
+├── references/               # 参考基因组和注释文件
+├── scripts/                  # 分析脚本
+│   ├── qc/                  # 质量控制脚本
+│   ├── alignment/          # 序列比对脚本
+│   ├── expression/         # 基因表达分析脚本
+│   └── motif/              # Motif分析脚本
+├── workflow/                 # Snakemake流程定义
+├── config/                   # 配置文件
+├── envs/                     # Conda环境配置
+├── results/                  # 分析结果
+│   ├── qc/
+│   ├── alignment/
+│   ├── counts/
+│   ├── differential_expression/
+│   └── motif_analysis/
+└── logs/                     # 运行日志
+```
 
 ## 结果输出
 
@@ -66,6 +115,18 @@ snakemake --cores 4 --configfile config/config.yaml
 - `results/counts/` - 基因计数结果
 - `results/differential_expression/` - 差异表达分析结果
 - `results/motif_analysis/` - Motif发现结果
+
+## 技术实现细节
+
+### 关键参数设置
+- Trimmomatic修剪参数：LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:18
+- Bowtie2比对参数：very-sensitive-local，适合small RNA测序
+- DESeq2分析参数：padj<0.05，log2FC>1.0
+- MEME motif长度：6-12个碱基对
+
+### 分析统计阈值
+- 差异表达基因筛选：padj < 0.05，|log2FC| > 1.0
+- Motif显著性：E-value < 10
 
 ## 常见问题
 
@@ -96,29 +157,12 @@ snakemake --cores 4 --configfile config/config.yaml results/differential_express
 
 使用4个CPU核心，完整分析大约需要2-3小时。如果使用8个核心，时间会缩短。
 
-## 技术支持
+### 问：系统要求是什么？
 
-如果遇到问题，请检查：
-
-1. 是否激活了conda环境：`conda activate small_rna_analysis`
-2. 磁盘空间是否充足
-3. 内存是否足够（建议至少8GB）
-
-## 项目结构
-
-```
-small_rna_project/
-├── data/              # 数据目录
-├── references/        # 参考基因组
-├── scripts/           # 分析脚本
-├── workflow/          # Snakemake流程定义
-├── config/            # 配置文件
-├── envs/              # Conda环境配置
-├── docs/              # 文档目录
-├── reports/           # 分析报告
-├── results/           # 分析结果
-└── logs/              # 运行日志
-```
+- **操作系统**：Windows 10/11（使用WSL2）或 Linux
+- **内存**：至少8GB RAM（推荐16GB）
+- **磁盘空间**：至少20GB可用空间
+- **CPU**：至少4个核心（推荐8个或更多）
 
 ## 许可证
 
