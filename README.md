@@ -45,10 +45,8 @@ chmod +x install_everything.sh
 
 ### 手动下载参考资源（推荐使用WSL2下载）
 
-**重要提示**：经测试，所有国内镜像源（清华大学、中国科学技术大学、北京外国语大学）都返回404错误，无法使用。请使用以下官方源：
-
 #### 1. hg38参考基因组序列
-**唯一可用源：UCSC官方源**
+**可用源：UCSC官方源**
 - **下载地址**：https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
 - **目标文件**：`references/hg38.fa`
 - **操作步骤**：
@@ -59,7 +57,7 @@ chmod +x install_everything.sh
   ```
 
 #### 2. hg38基因注释文件
-**唯一可用源：UCSC官方源**
+**可用源：UCSC官方源**
 - **下载地址**：https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz
 - **目标文件**：`references/hg38.gtf`
 - **操作步骤**：
@@ -107,7 +105,7 @@ ls -lh data/raw_fastq/fastq_files/
 
 1. **数据质量检查** - 检查测序数据的质量
 2. **序列修剪** - 去除低质量的序列和接头
-3. **序列比对** - 将测序序列比对到人类参考基因组
+3. **序列比对** - 将测序序列比对到参考基因组
 4. **基因计数** - 统计每个基因的序列数量
 5. **差异表达分析** - 找出GAO组和PAL组之间表达量有显著差异的基因
 6. **Motif发现** - 发现差异表达基因中可能的调控序列模式
@@ -115,7 +113,7 @@ ls -lh data/raw_fastq/fastq_files/
 ## 项目数据
 
 ### 原始数据
-- 12个fastq.gz测序文件，位置：`data/raw_fastq/fastq_files/`
+- fastq.gz测序文件，位置：`data/raw_fastq/fastq_files/`
 - 样本信息：`data/metadata/sample_info.csv`
 
 **样本分组：**
@@ -123,8 +121,8 @@ ls -lh data/raw_fastq/fastq_files/
 - PAL组：PAL_1, PAL_2, PAL_3
 
 ### 参考数据
-- hg38参考基因组：`references/hg38.fa`
-- hg38基因注释：`references/hg38.gtf`
+- 参考基因组：`references/*.fa`
+- 基因注释：`references/*.gtf`
 - Bowtie2索引：`references/bowtie2_index/`（运行时生成）
 
 ## 项目依赖的配置文件
@@ -142,9 +140,9 @@ small_rna_project/
 │   ├── processed/                    # 处理后的中间数据
 │   └── metadata/                     # 样本信息和分组信息
 ├── references/                       # 参考基因组和注释文件
-│   ├── hg38.fa                       # hg38参考基因组
-│   ├── hg38.gtf                      # hg38基因注释
-│   ├── hg38.mirbase.gff3             # miRBase注释
+│   ├── *.fa                       # 参考基因组
+│   ├── *.gtf                      # 基因注释
+│   ├── *.mirbase.gff3             # miRBase注释
 │   └── bowtie2_index/                # Bowtie2索引目录
 ├── scripts/                          # 分析脚本
 │   ├── qc/                          # 质量控制脚本
@@ -174,9 +172,9 @@ small_rna_project/
 - `results/differential_expression/` - 差异表达分析结果
 - `results/motif_analysis/` - Motif发现结果
 
-## 超参数配置指南
+## 参数配置指南
 
-本项目的所有超参数都可以在 `config/config.yaml` 文件中进行修改。以下是详细的参数说明：
+本项目的所有参数都可以在 `config/config.yaml` 文件中进行修改。以下是详细的参数说明：
 
 ### 1. 样本信息配置
 | 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
