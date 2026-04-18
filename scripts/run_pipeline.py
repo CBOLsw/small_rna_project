@@ -300,13 +300,17 @@ def main():
     if args.check:
         logger.info("运行项目状态检查")
         check_command = ['python', 'scripts/utils/final_check.py']
-        result = subprocess.run(check_command, capture_output=True, text=True)
+        result = subprocess.run(check_command, capture_output=True, text=True, encoding='utf-8', errors='replace')
         if result.returncode == 0:
             logger.info("项目状态检查通过")
-            logger.info(result.stdout)
+            if result.stdout:
+                sys.stdout.buffer.write(result.stdout.encode('utf-8', 'replace'))
+                print()
         else:
             logger.error("项目状态检查失败")
-            logger.error(result.stderr)
+            if result.stderr:
+                sys.stderr.buffer.write(result.stderr.encode('utf-8', 'replace'))
+                print()
         return result.returncode
 
     # 确定目标
