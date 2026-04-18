@@ -4,18 +4,17 @@
 # 适用于WSL2/Linux系统
 # 使用mamba替代conda，速度提升10倍
 # 配置国内镜像源加速下载
+# 解决Bioconductor数据包（如GenomeInfoDbData）下载慢和卡住的问题
 
 echo "=========================================="
 echo "Small RNA项目环境安装脚本"
 echo "=========================================="
 
-# 项目目录
 PROJECT_DIR=$(pwd)
 echo "项目目录: $PROJECT_DIR"
+echo ""
 
 # 1. 检测系统
-echo ""
-echo "1. 检测系统..."
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     echo "操作系统: $PRETTY_NAME"
@@ -24,8 +23,6 @@ else
 fi
 
 # 2. 检查Miniconda
-echo ""
-echo "2. 检查Miniconda..."
 if [ -f "$HOME/miniconda3/bin/conda" ]; then
     echo "Miniconda已安装"
     export PATH="$HOME/miniconda3/bin:$PATH"
@@ -39,8 +36,6 @@ else
 fi
 
 # 3. 配置Conda镜像源
-echo ""
-echo "3. 配置Conda镜像源..."
 cat > ~/.condarc << 'EOF'
 channels:
   - defaults
@@ -56,147 +51,98 @@ custom_channels:
   pytorch: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
   simpleitk: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
 EOF
-echo "镜像源配置完成（使用清华源加速下载）"
+echo "conda镜像源配置完成（清华源）"
 
-# 4. 配置R镜像源（用于Bioconductor包下载）
-echo ""
-echo "4. 配置R镜像源..."
+# 4. 配置R镜像源
 mkdir -p ~/.R
 cat > ~/.Rprofile << 'EOFR'
-# R配置文件 - 使用国内镜像源加速Bioconductor包下载
-
-# 设置Bioconductor镜像（清华大学）
 options(BioC_mirror = "https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
-
-# 设置CRAN镜像（清华大学）
-options(repos = c(
-  CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"
-))
-
-# 提示信息
+options(repos = c(CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
 message("已配置使用清华镜像源:")
 message("  - Bioconductor: https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
 message("  - CRAN: https://mirrors.tuna.tsinghua.edu.cn/CRAN/")
 EOFR
-echo "R镜像源配置完成（使用清华源加速Bioconductor包下载）"
+echo "R镜像源配置完成（清华源）"
 
-# 5. 安装mamba（快速包管理器）
-echo ""
-echo "5. 安装mamba（快速包管理器）..."
+# 5. 安装mamba
 if ! command -v mamba &> /dev/null; then
     echo "正在安装mamba..."
     conda install -y -c conda-forge mamba > /dev/null 2>&1
-    echo "mamba安装完成"
-else
-    echo "mamba已安装"
 fi
 
-# 6. 创建项目环境
-echo ""
-echo "6. 创建项目环境..."
+# 6. 删除旧环境
 if conda env list | grep -q "small_rna_analysis"; then
-    echo "环境已存在，正在删除..."
+    echo "删除旧环境..."
     mamba env remove -n small_rna_analysis -y > /dev/null 2>&1
 fi
 
-echo "正在创建新环境（使用mamba加速）..."
-echo "这可能需要5-10分钟，取决于网络速度..."
-
-# 设置 R 环境变量，确保 Bioconductor 镜像源生效
-export R_PROFILE_USER="$HOME/.Rprofile"
-
-# 设置环境变量，确保 R 安装时使用正确的镜像源
-export BIOCONDUCTOR_MIRROR="https://mirrors.tuna.tsinghua.edu.cn/bioconductor"
-export R_REPOSITORIES="https://mirrors.tuna.tsinghua.edu.cn/CRAN/"
-
-# 预下载Bioconductor大包（使用清华镜像）
-echo "预下载Bioconductor数据包..."
+# 7. 预下载Bioconductor大包（关键：使用清华镜像）
+echo "预下载Bioconductor数据包（避免卡住）..."
 mkdir -p /tmp/bioc_packages
 cd /tmp/bioc_packages
-
-# 下载GenomeInfoDbData（如果还没有）
 if [ ! -f "GenomeInfoDbData_1.2.11.tar.gz" ]; then
-    echo "正在下载GenomeInfoDbData（从清华镜像）..."
-    wget -q "https://mirrors.tuna.tsinghua.edu.cn/bioconductor/packages/3.18/data/annotation/src/contrib/GenomeInfoDbData_1.2.11.tar.gz" || true
+    echo "正在下载GenomeInfoDbData（清华镜像）..."
+    wget -q "https://mirrors.tuna.tsinghua.edu.cn/bioconductor/packages/3.18/data/annotation/src/contrib/GenomeInfoDbData_1.2.11.tar.gz"
 fi
-cd - > /dev/null
+cd -
 
-# 执行环境创建，显示完整输出
-echo "正在创建核心conda环境（不含bioconductor-data-packages）..."
-mamba env create -f envs/small_rna_analysis_core.yaml
+# 8. 创建新环境
+echo "正在创建conda环境（使用mamba加速）..."
+mamba env create -f envs/small_rna_analysis.yaml
 
 if [ $? -eq 0 ]; then
-    echo "核心环境创建完成"
+    echo "环境创建成功"
 
-    # 激活环境并配置R镜像源
     eval "$(conda shell.bash hook)"
     conda activate small_rna_analysis
 
-    # 如果预下载成功，手动安装GenomeInfoDbData
+    # 手动安装预下载的Bioconductor包
     if [ -f "/tmp/bioc_packages/GenomeInfoDbData_1.2.11.tar.gz" ]; then
         echo "手动安装GenomeInfoDbData..."
         R -e "install.packages('/tmp/bioc_packages/GenomeInfoDbData_1.2.11.tar.gz', repos = NULL, type = 'source')" 2>&1
     fi
 
-    # 安装DESeq2和其他Bioconductor包
-    echo "正在安装Bioconductor包..."
-    ./install_bioc_packages.sh
-
-    # 在conda环境中创建.Rprofile文件
+    # 在conda环境中创建.Rprofile
     R_PROFILE_PATH="$CONDA_PREFIX/.Rprofile"
     cat > "$R_PROFILE_PATH" << 'EOFR'
-# R配置文件 - 使用国内镜像源加速Bioconductor包下载
-
-# 设置Bioconductor镜像（清华大学）
 options(BioC_mirror = "https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
-
-# 设置CRAN镜像（清华大学）
-options(repos = c(
-  CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"
-))
-
-# 提示信息
-message("已配置使用清华镜像源:")
-message("  - Bioconductor: https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
-message("  - CRAN: https://mirrors.tuna.tsinghua.edu.cn/CRAN/")
+options(repos = c(CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
 EOFR
 
-    echo "R镜像源配置已写入conda环境"
+    # 安装DESeq2和其他Bioconductor包
+    echo "正在安装Bioconductor包..."
+    R -e "options(BioC_mirror='https://mirrors.tuna.tsinghua.edu.cn/bioconductor'); if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager'); BiocManager::install('DESeq2', ask=FALSE)"
+
 else
     echo "环境创建失败，尝试使用conda..."
     conda env create -f envs/small_rna_analysis.yaml
 fi
 
-# 7. 检查apt-get包（可选）
-echo ""
-echo "7. 检查生物信息学工具..."
+# 9. 检查apt-get包（可选）
 if command -v apt-get &> /dev/null; then
-    echo "检测到Debian/Ubuntu系统"
-    echo "正在安装生物信息学工具..."
+    echo "安装系统依赖..."
     sudo apt-get update -qq && sudo apt-get install -qq -y fastqc samtools bowtie2 trimmomatic > /dev/null 2>&1
-    echo "工具安装完成"
-else
-    echo "跳过apt-get包安装（需手动安装生物信息学工具）"
 fi
 
-# 8. 检查项目文件
+# 10. 检查项目文件
 echo ""
-echo "8. 检查项目文件..."
+echo "检查项目文件..."
 if [ -f "references/hg38.fa" ]; then
-    echo "✅ 参考基因组已存在"
+    echo "✓ 参考基因组已存在"
 else
     echo "⚠️  参考基因组未找到，正在下载..."
     python download_references.py
 fi
 
 if [ -f "data/metadata/sample_info.csv" ]; then
-    echo "✅ 样本信息已存在"
+    echo "✓ 样本信息已存在"
 else
     echo "⚠️  样本信息未找到"
 fi
 
-# 9. 完成提示
-echo ""
+# 11. 清理
+rm -rf /tmp/bioc_packages
+
 echo "=========================================="
 echo "环境安装完成！"
 echo "=========================================="
@@ -204,7 +150,4 @@ echo ""
 echo "使用方法："
 echo "1. 激活环境: conda activate small_rna_analysis"
 echo "2. 查看流程: snakemake -n --configfile config/config.yaml"
-echo "3. 运行流程: snakemake --cores 8 --configfile config/config.yaml"
-echo ""
-echo "项目文档请查看: docs/environment_setup.md"
-echo ""
+echo "3. 运行流程: snakemake --cores 4 --configfile config/config.yaml"
