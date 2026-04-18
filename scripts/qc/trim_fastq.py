@@ -60,7 +60,19 @@ class TrimmomaticProcessor:
     def check_trimmomatic(self) -> bool:
         """检查Trimmomatic是否可用"""
         try:
-            # 检查Java
+            # 检查Trimmomatic是否可以直接运行（conda包装器）
+            cmd = [self.trimmomatic_path, "-version"]
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            if result.returncode == 0:
+                logger.info(f"Trimmomatic可用: {self.trimmomatic_path}")
+                return True
+
+            # 如果失败，检查Java和jar文件方式
             java_check = subprocess.run(
                 [self.java_path, "-version"],
                 capture_output=True,
@@ -71,11 +83,9 @@ class TrimmomaticProcessor:
                 logger.error("Java检查失败")
                 return False
 
-            # 检查Trimmomatic
-            cmd = [
-                self.java_path, "-jar", self.trimmomatic_path,
-                "-version"
-            ]
+            # 尝试用java -jar运行
+            logger.warning("直接运行失败，尝试java -jar方式")
+            cmd = [self.java_path, "-jar", self.trimmomatic_path, "-version"]
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -195,14 +205,26 @@ class TrimmomaticProcessor:
     def _build_single_end_command(self, input_file: Path, output_file: Path,
                                   log_file: Path, config: Dict[str, Any]) -> List[str]:
         """构建单端Trimmomatic命令"""
-        cmd = [
-            self.java_path, "-jar", self.trimmomatic_path,
-            "SE",
-            "-threads", str(config.get('threads', 4)),
-            "-phred33",  # small RNA通常使用phred33
-            str(input_file),
-            str(output_file)
-        ]
+        # 检查trimmomatic是否是可直接运行的
+        if self.trimmomatic_path == "trimmomatic" or self.trimmomatic_path.endswith("/trimmomatic"):
+            cmd = [
+                self.trimmomatic_path,
+                "SE",
+                "-threads", str(config.get('threads', 4)),
+                "-phred33",  # small RNA通常使用phred33
+                str(input_file),
+                str(output_file)
+            ]
+        else:
+            # 使用java -jar方式
+            cmd = [
+                self.java_path, "-jar", self.trimmomatic_path,
+                "SE",
+                "-threads", str(config.get('threads', 4)),
+                "-phred33",
+                str(input_file),
+                str(output_file)
+            ]
 
         # 添加Trimmomatic步骤
         cmd.extend(self._build_trimmomatic_steps(config))
@@ -217,18 +239,34 @@ class TrimmomaticProcessor:
                                   output_r2_paired: Path, output_r2_unpaired: Path,
                                   log_file: Path, config: Dict[str, Any]) -> List[str]:
         """构建双端Trimmomatic命令"""
-        cmd = [
-            self.java_path, "-jar", self.trimmomatic_path,
-            "PE",
-            "-threads", str(config.get('threads', 4)),
-            "-phred33",
-            str(input_r1),
-            str(input_r2),
-            str(output_r1_paired),
-            str(output_r1_unpaired),
-            str(output_r2_paired),
-            str(output_r2_unpaired)
-        ]
+        # 检查trimmomatic是否是可直接运行的
+        if self.trimmomatic_path == "trimmomatic" or self.trimmomatic_path.endswith("/trimmomatic"):
+            cmd = [
+                self.trimmomatic_path,
+                "PE",
+                "-threads", str(config.get('threads', 4)),
+                "-phred33",
+                str(input_r1),
+                str(input_r2),
+                str(output_r1_paired),
+                str(output_r1_unpaired),
+                str(output_r2_paired),
+                str(output_r2_unpaired)
+            ]
+        else:
+            # 使用java -jar方式
+            cmd = [
+                self.java_path, "-jar", self.trimmomatic_path,
+                "PE",
+                "-threads", str(config.get('threads', 4)),
+                "-phred33",
+                str(input_r1),
+                str(input_r2),
+                str(output_r1_paired),
+                str(output_r1_unpaired),
+                str(output_r2_paired),
+                str(output_r2_unpaired)
+            ]
 
         # 添加Trimmomatic步骤
         cmd.extend(self._build_trimmomatic_steps(config))
