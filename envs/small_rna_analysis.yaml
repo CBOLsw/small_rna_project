@@ -11,6 +11,8 @@ variables:
 dependencies:
   - python=3.9
   - pip
+  - freetype
+  - fontconfig
   - fastqc=0.12
   - trimmomatic=0.39
   - cutadapt=4.6
