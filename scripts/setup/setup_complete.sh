@@ -53,7 +53,10 @@ print_progress() {
 
 print_header "Small RNA项目环境安装脚本"
 
-PROJECT_DIR=$(pwd)
+# 获取项目目录（脚本在scripts/setup/，需要向上两级）
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+PROJECT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
+cd "$PROJECT_DIR"
 print_info "项目目录: $PROJECT_DIR"
 
 # 1. 检测系统
