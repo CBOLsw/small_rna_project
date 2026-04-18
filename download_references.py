@@ -107,12 +107,13 @@ class ReferenceDownloader:
 
     def download_hg38_genome(self) -> Optional[str]:
         """下载hg38参考基因组 - 使用国内镜像源"""
-        # 使用NCBI的国内镜像或UCSC镜像
         url_candidates = [
-            # 清华大学镜像源（推荐，速度快）
-            "https://mirrors.tuna.tsinghua.edu.cn/genome/UCSC/hg38/bigZips/hg38.fa.gz",
-            # 备用镜像
+            # 源1：直接从1000 Genomes项目下载（较稳定）
+            "ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz",
+            # 源2：UCSC官方HTTPS
             "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz",
+            # 源3：NCBI refseq（备用）
+            "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc.fa.gz",
         ]
 
         dest_path = self.ref_dir / "hg38.fa"
@@ -130,10 +131,10 @@ class ReferenceDownloader:
     def download_hg38_gtf(self) -> Optional[str]:
         """下载hg38基因注释 - 使用国内镜像源"""
         url_candidates = [
-            # 清华大学镜像源
-            "https://mirrors.tuna.tsinghua.edu.cn/genome/UCSC/hg38/bigZips/genes/hg38.knownGene.gtf.gz",
-            # 备用镜像
+            # 源1：UCSC官方HTTPS（已知稳定）
             "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz",
+            # 源2：NCBI refseq（备用）
+            "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/GCA_000001405.15_GRCh38_genomic.gff.gz",
         ]
 
         dest_path = self.ref_dir / "hg38.gtf"
