@@ -46,24 +46,6 @@ chmod +x scripts/setup/install_everything.sh
 5. 安装Bioconductor包
 6. 检查项目状态
 
-### 手动操作流程（如果您已安装过环境）
-
-如果您已通过一键安装配置过环境，可直接执行以下步骤：
-
-```bash
-# 1. 激活环境
-conda activate small_rna_analysis
-
-# 2. 进入项目目录
-cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
-
-# 3. 检查项目状态
-python scripts/run_pipeline.py --config config/config.yaml --check
-
-# 4. 运行分析（使用8个CPU核心）
-python scripts/run_pipeline.py --config config/config.yaml --cores 8
-```
-
 ---
 
 ## 参考资源下载（如需手动更新）
@@ -128,7 +110,6 @@ ls -lh data/raw_fastq/fastq_files/
 
 **说明：本章节仅在您遇到以下问题时使用**
 
-- trimmomatic无法找到或安装失败
 - 使用了Windows的conda导致的环境问题
 - 在WSL2中看到Windows的conda环境
 
@@ -182,95 +163,43 @@ conda create -n small_rna_analysis_linux python=3.9 -c bioconda trimmomatic=0.39
 - `conda info --envs` 显示的路径应该是 `/home/你的用户名/miniconda/envs/`
 - `conda list trimmomatic` 应该显示 `trimmomatic 0.39`
 
-## 安装完成后的分析流程操作
+## 分析流程操作
 
-### 1. 激活分析环境
+### 快速开始（已配置环境）
 
 ```bash
-# 激活conda环境
+# 1. 激活分析环境
 conda activate small_rna_analysis
 
-# 验证环境激活成功
-conda info --envs
-```
+# 2. 进入项目目录
+cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
 
-### 2. 检查项目状态
-
-```bash
-# 运行项目状态检查，确保所有配置正确
+# 3. 检查项目状态
 python scripts/run_pipeline.py --config config/config.yaml --check
 
-# 或者运行更详细的状态检查
-python scripts/utils/final_check.py
-```
-
-### 3. 查看分析步骤（Dry-run模式）
-
-```bash
-# 查看将要执行的步骤，不实际运行
+# 4. 查看将要执行的步骤
 python scripts/run_pipeline.py --config config/config.yaml --dry-run
+
+# 5. 运行完整分析（使用8个CPU核心）
+python scripts/run_pipeline.py --config config/config.yaml --cores 8
 ```
 
-### 4. 运行完整分析流程
+### 常用操作
 
 ```bash
-# 使用默认配置运行完整分析（推荐8个CPU核心）
-python scripts/run_pipeline.py --config config/config.yaml
+# 分模块运行分析
+python scripts/run_pipeline.py --config config/config.yaml --module qc      # 质量控制
+python scripts/run_pipeline.py --config config/config.yaml --module alignment  # 序列比对
+python scripts/run_pipeline.py --config config/config.yaml --module counts    # 基因计数
+python scripts/run_pipeline.py --config config/config.yaml --module de        # 差异表达分析
+python scripts/run_pipeline.py --config config/config.yaml --module motif     # Motif分析
 
-# 或者指定更多CPU核心加速分析
-python scripts/run_pipeline.py --config config/config.yaml --cores 16
-
-# 保存日志到文件
-python scripts/run_pipeline.py --config config/config.yaml --log-file logs/analysis.log
-```
-
-### 5. 分模块运行分析
-
-如果需要分步运行分析：
-
-```bash
-# 仅运行数据质量控制
-python scripts/run_pipeline.py --config config/config.yaml --module qc
-
-# 仅运行序列比对
-python scripts/run_pipeline.py --config config/config.yaml --module alignment
-
-# 仅运行基因计数
-python scripts/run_pipeline.py --config config/config.yaml --module counts
-
-# 仅运行差异表达分析
-python scripts/run_pipeline.py --config config/config.yaml --module de
-
-# 仅运行Motif分析
-python scripts/run_pipeline.py --config config/config.yaml --module motif
-```
-
-### 6. 从失败处恢复执行
-
-如果分析过程中出现中断：
-
-```bash
-# 从上次失败的步骤恢复执行
+# 从失败处恢复执行
 python scripts/run_pipeline.py --config config/config.yaml --resume
-```
 
-### 7. 检查分析结果
-
-```bash
-# 查看生成的结果文件
-ls -lh results/
-ls -lh results/qc/
-ls -lh results/alignment/
-ls -lh results/counts/
-ls -lh results/differential_expression/
-ls -lh results/motif_analysis/
-```
-
-### 8. 查看分析状态
-
-```bash
-# 检查当前流程执行状态
+# 查看分析状态和结果
 python scripts/run_pipeline.py --config config/config.yaml --status
+ls -lh results/
 ```
 
 ## 分析流程
