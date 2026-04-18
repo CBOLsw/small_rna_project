@@ -15,12 +15,18 @@ from urllib.error import URLError, HTTPError
 import logging
 from typing import Optional
 
-# 配置日志 - 简化格式，去掉时间戳
+# 配置日志 - 简化格式，避免Windows编码问题
 logging.basicConfig(
     level=logging.INFO,
     format='%(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# 修复Windows编码问题
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 
 class ReferenceDownloader:
@@ -33,16 +39,16 @@ class ReferenceDownloader:
     def print_header(self, title: str):
         """打印标题"""
         logger.info("")
-        logger.info("╔" + "═" * 58 + "╗")
-        logger.info(f"║  {title:^52}  ║")
-        logger.info("╚" + "═" * 58 + "╝")
+        logger.info("+" + "-" * 58 + "+")
+        logger.info(f"|  {title:^52}  |")
+        logger.info("+" + "-" * 58 + "+")
 
     def download_file(self, url: str, dest_path: str, description: str = "文件") -> Optional[str]:
         """下载文件"""
         dest_path = Path(dest_path)
 
         if dest_path.exists():
-            logger.info(f"  ✓ {description}已存在")
+            logger.info(f"  [OK] {description}已存在")
             return str(dest_path)
 
         logger.info(f"  正在下载{description}...")
@@ -52,10 +58,9 @@ class ReferenceDownloader:
             def report_progress(block_num, block_size, total_size):
                 if total_size > 0:
                     percent = min(100, (block_num * block_size * 100) / total_size)
-                    # 更简洁的进度条
                     bar_length = 40
                     filled = int(percent / 100 * bar_length)
-                    bar = "█" * filled + "░" * (bar_length - filled)
+                    bar = "=" * filled + "-" * (bar_length - filled)
                     sys.stdout.write(f"\r  [{bar}] {percent:.1f}%")
                     sys.stdout.flush()
 
@@ -63,7 +68,7 @@ class ReferenceDownloader:
             temp_path = dest_path.with_suffix(dest_path.suffix + '.tmp')
             request.urlretrieve(url, temp_path, reporthook=report_progress)
 
-            sys.stdout.write("\r  ✓ 下载完成！\n")
+            sys.stdout.write("\r  [OK] 下载完成！\n")
             sys.stdout.flush()
 
             # 如果是gz文件，解压
@@ -90,17 +95,17 @@ class ReferenceDownloader:
             return str(dest_path)
 
         except HTTPError as e:
-            logger.error(f"  ✗ HTTP错误 ({e.code}): {e.reason}")
+            logger.error(f"  [ERROR] HTTP错误 ({e.code}): {e.reason}")
             if 'temp_path' in locals() and temp_path.exists():
                 temp_path.unlink()
             return None
         except URLError as e:
-            logger.error(f"  ✗ URL错误: {e.reason}")
+            logger.error(f"  [ERROR] URL错误: {e.reason}")
             if 'temp_path' in locals() and temp_path.exists():
                 temp_path.unlink()
             return None
         except Exception as e:
-            logger.error(f"  ✗ 下载失败: {e}")
+            logger.error(f"  [ERROR] 下载失败: {e}")
             if 'temp_path' in locals() and temp_path.exists():
                 temp_path.unlink()
             return None
@@ -162,7 +167,7 @@ class ReferenceDownloader:
 
         # 如果文件已存在，直接返回
         if dest_path.exists():
-            logger.info("  ✓ miRBase small RNA注释已存在")
+            logger.info("  [OK] miRBase small RNA注释已存在")
             return str(dest_path)
 
         # 尝试每个URL
@@ -170,11 +175,11 @@ class ReferenceDownloader:
             logger.info(f"  尝试下载miRBase注释 (源{i+1}/{len(url_candidates)})")
             result = self.download_file(url, dest_path, "miRBase small RNA注释")
             if result is not None:
-                logger.info("  ✓ 成功下载miRBase注释")
+                logger.info("  [OK] 成功下载miRBase注释")
                 return result
 
         # 所有URL都失败
-        logger.warning("  ⚠ 所有miRBase下载源都失败，small RNA注释将不可用")
+        logger.warning("  [WARNING] 所有miRBase下载源都失败，small RNA注释将不可用")
         return None
 
     def prepare_index_directory(self) -> Path:
@@ -208,7 +213,7 @@ class ReferenceDownloader:
         index_dir = self.prepare_index_directory()
         results['index_dir'] = str(index_dir)
 
-        self.print_header("下载完成！")
+        self.print_header("下载完成!")
 
         # 显示文件列表
         logger.info("")
@@ -218,7 +223,7 @@ class ReferenceDownloader:
                 file_path = Path(file_path)
                 if file_path.exists():
                     size_mb = file_path.stat().st_size / (1024 * 1024)
-                    logger.info(f"  ✓ {file_type}: {file_path.name} ({size_mb:.1f} MB)")
+                    logger.info(f"  [OK] {file_type}: {file_path.name} ({size_mb:.1f} MB)")
 
         logger.info(f"\n索引目录: {index_dir}")
 

@@ -6,6 +6,11 @@
 # 配置国内镜像源加速下载
 # 解决Bioconductor数据包（如GenomeInfoDbData）下载慢和卡住的问题
 
+# 获取当前时间戳
+get_timestamp() {
+    date "+%H:%M:%S"
+}
+
 print_header() {
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════╗"
@@ -14,20 +19,36 @@ print_header() {
 }
 
 print_step() {
+    local step_num=$1
+    local step_desc=$2
     echo ""
-    echo "▶ 步骤 $1: $2"
+    echo "┌─────────────────────────────────────────────────────────────────┐"
+    echo "│  [$(get_timestamp)] 步骤 $step_num: $step_desc"
+    echo "└─────────────────────────────────────────────────────────────────┘"
 }
 
 print_success() {
-    echo "  ✓ $1"
+    echo "  [$(get_timestamp)] ✓ 成功: $1"
 }
 
 print_info() {
-    echo "  ℹ $1"
+    echo "  [$(get_timestamp)] ℹ 信息: $1"
 }
 
 print_warning() {
-    echo "  ⚠  $1"
+    echo "  [$(get_timestamp)] ⚠ 警告: $1"
+}
+
+print_error() {
+    echo "  [$(get_timestamp)] ✗ 错误: $1"
+}
+
+print_progress() {
+    local current=$1
+    local total=$2
+    local message=$3
+    local percent=$((current * 100 / total))
+    echo "  [$(get_timestamp)] [$current/$total] $message ($percent%)"
 }
 
 print_header "Small RNA项目环境安装脚本"

@@ -21,32 +21,85 @@
 - **Python 3.9+**: 数据分析和脚本编写
 - **R 4.3+**: 统计分析和可视化
 
-## 快速开始（推荐WSL2/Linux）
+## 快速开始（WSL2/Linux）
 
-### 一键安装（最简单）
+### 一键安装（推荐）
 
 ```bash
 # 1. 进入项目目录
 cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
 
 # 2. 给安装脚本添加执行权限
-chmod +x setup_complete.sh install_bioc_packages.sh
+chmod +x install_everything.sh
 
-# 3. 运行一键安装（预计30-45分钟）
-./setup_complete.sh
+# 3. 运行一键安装（预计45-60分钟）
+./install_everything.sh
 ```
 
-### 安装完成后
+**脚本会自动执行：**
+1. 检查系统环境
+2. 创建项目目录结构
+3. 检查数据文件
+4. 下载参考基因组（如果不存在）
+5. 安装完整分析环境（Conda + R包）
 
+### 手动下载参考资源（如果自动下载慢）
+
+如果自动下载太慢，可以手动下载以下文件并放到指定目录：
+
+#### 1. hg38参考基因组序列
+- **下载地址**：https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
+- **备用地址**：https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc.fa.gz
+- **目标文件**：`references/hg38.fa`
+- **操作步骤**：
+  ```bash
+  # 下载并解压
+  cd references
+  wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
+  gunzip hg38.fa.gz
+  ```
+
+#### 2. hg38基因注释文件
+- **下载地址**：https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz
+- **备用地址**：https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/GCA_000001405.15_GRCh38_genomic.gff.gz
+- **目标文件**：`references/hg38.gtf`
+- **操作步骤**：
+  ```bash
+  cd references
+  wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz
+  gunzip hg38.knownGene.gtf.gz
+  mv hg38.knownGene.gtf hg38.gtf
+  ```
+
+#### 3. miRBase small RNA注释（可选）
+- **下载地址**：https://www.mirbase.org/ftp/CURRENT/genomes/hsa.gff3
+- **备用地址**：ftp://mirbase.org/pub/mirbase/CURRENT/genomes/hsa.gff3
+- **目标文件**：`references/hg38.mirbase.gff3`
+- **操作步骤**：
+  ```bash
+  cd references
+  wget https://www.mirbase.org/ftp/CURRENT/genomes/hsa.gff3
+  mv hsa.gff3 hg38.mirbase.gff3
+  ```
+
+#### 4. 测序数据文件（必须）
+将您的12个fastq.gz测序文件放到：
+- **目标目录**：`data/raw_fastq/fastq_files/`
+
+**示例文件名**：
+```
+HeLa-GAO1_S87_L002_R1_001.fastq.gz
+HeLa-GAO1_S87_L002_R2_001.fastq.gz
+HeLa-GAO2_S58_L004_R1_001.fastq.gz
+HeLa-GAO2_S58_L004_R2_001.fastq.gz
+...
+```
+
+**文件检查**：
+下载完成后，运行以下命令检查文件完整性：
 ```bash
-# 激活分析环境
-conda activate small_rna_analysis
-
-# 查看分析流程
-snakemake -n --configfile config/config.yaml
-
-# 运行分析（使用4个CPU核心）
-snakemake --cores 4 --configfile config/config.yaml
+ls -lh references/
+ls -lh data/raw_fastq/fastq_files/
 ```
 
 ## 分析流程
@@ -85,25 +138,31 @@ snakemake --cores 4 --configfile config/config.yaml
 ```
 small_rna_project/
 ├── data/
-│   ├── raw_fastq/            # 原始测序数据
-│   ├── processed/            # 处理后的中间数据
-│   └── metadata/             # 样本信息和分组信息
-├── references/               # 参考基因组和注释文件
-├── scripts/                  # 分析脚本
-│   ├── qc/                  # 质量控制脚本
-│   ├── alignment/          # 序列比对脚本
-│   ├── expression/         # 基因表达分析脚本
-│   └── motif/              # Motif分析脚本
-├── workflow/                 # Snakemake流程定义
-├── config/                   # 配置文件
-├── envs/                     # Conda环境配置
-├── results/                  # 分析结果
+│   ├── raw_fastq/                    # 原始测序数据
+│   │   └── fastq_files/              # FASTQ文件目录
+│   ├── processed/                    # 处理后的中间数据
+│   └── metadata/                     # 样本信息和分组信息
+├── references/                       # 参考基因组和注释文件
+│   ├── hg38.fa                       # hg38参考基因组
+│   ├── hg38.gtf                      # hg38基因注释
+│   ├── hg38.mirbase.gff3             # miRBase注释
+│   └── bowtie2_index/                # Bowtie2索引目录
+├── scripts/                          # 分析脚本
+│   ├── qc/                          # 质量控制脚本
+│   ├── alignment/                  # 序列比对脚本
+│   ├── expression/                 # 基因表达分析脚本
+│   └── motif/                      # Motif分析脚本
+├── workflow/                        # Snakemake流程定义
+├── config/                          # 配置文件
+├── envs/                           # Conda环境配置
+├── results/                        # 分析结果
 │   ├── qc/
 │   ├── alignment/
 │   ├── counts/
 │   ├── differential_expression/
 │   └── motif_analysis/
-└── logs/                     # 运行日志
+├── logs/                          # 运行日志
+└── install_everything.sh         # 一键安装脚本
 ```
 
 ## 结果输出
@@ -130,13 +189,11 @@ small_rna_project/
 
 ## 常见问题
 
-### 问：安装卡住了怎么办？
-
-如果在安装Bioconductor数据包（如GenomeInfoDbData）时卡住了，可以按Ctrl+C停止安装，然后单独运行：
+### 问：如何运行分析？
 
 ```bash
 conda activate small_rna_analysis
-./install_bioc_packages.sh
+snakemake --cores 4 --configfile config/config.yaml
 ```
 
 ### 问：如何只运行部分分析？
