@@ -14,6 +14,7 @@ variables:
 dependencies:
   - python=3.9
   - pip
+  - openssl=1.1.1t  # 指定与R包兼容的OpenSSL版本，避免3.0+的兼容性问题
   - fastqc=0.12
   - trimmomatic=0.39
   - cutadapt=4.6
