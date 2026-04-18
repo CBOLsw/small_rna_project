@@ -109,9 +109,9 @@ if [ -f "references/hg38.fa" ] && [ -f "references/hg38.gtf" ]; then
 else
     print_info "正在下载参考基因组..."
     if command -v python3 &> /dev/null; then
-        python3 download_references.py
+        python3 scripts/utils/download_references.py
     elif command -v python &> /dev/null; then
-        python download_references.py
+        python scripts/utils/download_references.py
     else
         print_error "Python未找到，无法下载参考基因组"
         exit 1

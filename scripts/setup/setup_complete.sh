@@ -196,7 +196,7 @@ if [ -f "references/hg38.fa" ]; then
     print_success "参考基因组已存在"
 else
     print_warning "参考基因组未找到"
-    print_info "可运行: python download_references.py"
+    print_info "可运行: python scripts/utils/download_references.py"
 fi
 
 if [ -f "data/metadata/sample_info.csv" ]; then
