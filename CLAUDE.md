@@ -87,7 +87,83 @@ conda env create -f envs/small_rna_analysis.yaml
 conda activate small_rna_analysis
 ```
 
-### 流程执行
+### 流程执行（推荐使用run_pipeline.py）
+
+`run_pipeline.py` 是项目的核心执行脚本，提供了丰富的功能和参数。
+
+```bash
+# 基本使用格式
+python scripts/run_pipeline.py --config config/config.yaml [选项]
+
+# 1. 运行完整分析流程（使用默认配置）
+python scripts/run_pipeline.py --config config/config.yaml
+
+# 2. 仅运行质量控制模块
+python scripts/run_pipeline.py --config config/config.yaml --module qc
+
+# 3. 从上次失败处恢复执行
+python scripts/run_pipeline.py --config config/config.yaml --resume
+
+# 4. 检查流程状态
+python scripts/run_pipeline.py --config config/config.yaml --status
+
+# 5. 运行项目状态检查
+python scripts/run_pipeline.py --config config/config.yaml --check
+
+# 6. Dry-run模式（查看将要执行的步骤）
+python scripts/run_pipeline.py --config config/config.yaml --dry-run
+
+# 7. 指定CPU核心数运行
+python scripts/run_pipeline.py --config config/config.yaml --cores 12
+
+# 8. 保存日志到文件
+python scripts/run_pipeline.py --config config/config.yaml --log-file logs/pipeline.log
+
+# 9. 显示所有可用模块
+python scripts/run_pipeline.py --config config/config.yaml --list-modules
+
+# 10. 显示详细输出
+python scripts/run_pipeline.py --config config/config.yaml --verbose
+```
+
+### run_pipeline.py 参数详细说明
+
+#### 必需参数
+| 参数 | 说明 |
+|------|------|
+| `--config` 或 `-c` | 指定配置文件路径（必须） |
+
+#### 运行模式（互斥，一次只能使用一个）
+| 参数 | 说明 |
+|------|------|
+| 不指定模式 | 运行完整分析流程 |
+| `--module <模块名>` | 仅运行指定的模块 |
+| `--resume` | 从上次失败处恢复执行 |
+| `--dry-run` | 仅显示将要执行的步骤，不实际运行 |
+| `--status` | 检查当前流程的执行状态 |
+| `--check` | 运行项目状态和配置检查 |
+
+#### 可用模块
+使用 `--list-modules` 可以查看所有可用模块：
+
+| 模块名 | 说明 |
+|---------|------|
+| all | 运行完整分析流程（默认） |
+| check | 仅运行项目状态检查 |
+| qc | 仅运行数据质量控制模块 |
+| alignment | 仅运行序列比对模块 |
+| counts | 仅运行基因计数模块 |
+| de | 仅运行差异表达分析模块 |
+| motif | 仅运行motif分析模块 |
+
+#### 执行参数
+| 参数 | 说明 |
+|------|------|
+| `--cores <数字>` | 指定使用的CPU核心数（默认使用配置文件中的设置） |
+| `-v` 或 `--verbose` | 显示详细输出信息 |
+| `--log-file <文件路径>` | 指定日志文件路径（默认输出到标准输出） |
+
+#### 传统Snakemake命令（备选方案）
 ```bash
 # 运行完整分析流程（Snakemake）
 snakemake --cores 4 --configfile config/config.yaml
