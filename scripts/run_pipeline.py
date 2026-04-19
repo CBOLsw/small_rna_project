@@ -27,6 +27,9 @@ from pathlib import Path
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 
+# 添加项目根目录到Python路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # 尝试导入tqdm，如果失败则禁用进度条功能
 try:
     from tqdm import tqdm
