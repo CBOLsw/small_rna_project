@@ -102,14 +102,14 @@ class TrimmomaticProcessor:
             logger.error(f"未找到可执行文件: {e}")
             return False
 
-    def trim_single_end(self, input_file: str, output_dir: str,
+    def trim_single_end(self, input_file: str, output_file: str,
                         sample_name: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """
         处理单端测序数据
 
         参数:
             input_file: 输入fastq文件
-            output_dir: 输出目录
+            output_file: 输出文件路径
             sample_name: 样本名称
             config: 配置参数
 
@@ -119,15 +119,14 @@ class TrimmomaticProcessor:
         logger.info(f"处理单端样本: {sample_name}")
 
         # 构建输出文件路径
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = Path(output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        output_file = output_dir / f"{sample_name}_trimmed.fastq.gz"
-        log_file = output_dir / f"{sample_name}_trimmomatic.log"
+        log_file = output_path.parent / f"{sample_name}_trimmomatic.log"
 
         # 构建Trimmomatic命令
         cmd = self._build_single_end_command(
-            input_file, output_file, log_file, config
+            input_file, output_path, log_file, config
         )
 
         # 执行命令
@@ -136,7 +135,7 @@ class TrimmomaticProcessor:
         result = {
             'sample': sample_name,
             'input_file': input_file,
-            'output_file': str(output_file),
+            'output_file': str(output_path),
             'log_file': str(log_file),
             'success': success,
             'type': 'single_end',
@@ -551,29 +550,20 @@ def main():
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # 提取样本名
-    sample_name = input_path.stem
-    if sample_name.endswith('.fastq') or sample_name.endswith('.fq'):
-        sample_name = sample_name[:-6]
-    if sample_name.endswith('_R1') or sample_name.endswith('_R2'):
-        sample_name = sample_name[:-3]
+    # 提取样本名：从输出文件名提取，而不是输入文件名
+    sample_name = output_path.stem
+    if sample_name.endswith('_trimmed'):
+        sample_name = sample_name[:-8]
 
     # 执行修剪
     result = processor.trim_single_end(
         input_file=str(input_path),
-        output_dir=str(output_path.parent),
+        output_file=str(output_path),
         sample_name=sample_name,
         config=config
     )
 
-    # 检查结果并移动文件到指定输出位置
-    if result.get('success'):
-        original_output = Path(result['output_file'])
-        if original_output != output_path:
-            import shutil
-            shutil.move(str(original_output), str(output_path))
-            logger.info(f"已将输出文件移动到: {output_path}")
-    else:
+    if not result.get('success'):
         logger.error("Trimmomatic处理失败")
         sys.exit(1)
 

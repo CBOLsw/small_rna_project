@@ -151,48 +151,44 @@ class FastQCAnalyzer:
     def _parse_fastqc_result(self, fastq_file: Path, output_dir: Path, sample_name: str = None):
         """解析FastQC结果文件"""
         # FastQC输出文件名模式
-        # 首先尝试使用原始文件名
         base_name = fastq_file.name
         if base_name.endswith('.gz'):
             base_name = base_name[:-3]
         if base_name.endswith('.fastq') or base_name.endswith('.fq'):
             base_name = base_name[:-6]
 
-        result_file = output_dir / f"{base_name}_fastqc.html"
-        data_file = output_dir / f"{base_name}_fastqc.zip"
+        # 如果提供了sample_name，确保输出文件名使用sample_name
+        if sample_name:
+            # FastQC会使用原始文件名作为输出，我们需要重命名
+            original_result_file = output_dir / f"{base_name}_fastqc.html"
+            original_data_file = output_dir / f"{base_name}_fastqc.zip"
 
-        # 如果提供了sample_name，并且原始文件名的结果不存在，则尝试重命名
-        if sample_name and not result_file.exists():
-            # 使用sample_name来查找结果文件
             sample_result_file = output_dir / f"{sample_name}_fastqc.html"
             sample_data_file = output_dir / f"{sample_name}_fastqc.zip"
 
-            # 如果sample_name的结果文件存在，则使用它们
-            if sample_result_file.exists():
-                result_file = sample_result_file
-                data_file = sample_data_file
-            else:
-                # 否则，尝试将原始文件名的结果重命名为sample_name
-                original_result_file = output_dir / f"{base_name}_fastqc.html"
-                original_data_file = output_dir / f"{base_name}_fastqc.zip"
+            # 如果原始文件存在但sample文件不存在，则重命名
+            if original_result_file.exists() and not sample_result_file.exists():
+                import shutil
+                shutil.move(str(original_result_file), str(sample_result_file))
+                shutil.move(str(original_data_file), str(sample_data_file))
 
-                if original_result_file.exists():
-                    import shutil
-                    shutil.move(str(original_result_file), str(sample_result_file))
-                    shutil.move(str(original_data_file), str(sample_data_file))
-                    result_file = sample_result_file
-                    data_file = sample_data_file
+            result_file = sample_result_file
+            data_file = sample_data_file
+        else:
+            # 没有sample_name时使用原始文件名
+            result_file = output_dir / f"{base_name}_fastqc.html"
+            data_file = output_dir / f"{base_name}_fastqc.zip"
 
         if result_file.exists():
-            # 提取基本信息
-            sample_name = base_name
-            self.results[sample_name] = {
+            # 使用sample_name（如果提供）或base_name作为key
+            key = sample_name if sample_name else base_name
+            self.results[key] = {
                 'file': str(fastq_file),
                 'html_report': str(result_file),
                 'data_file': str(data_file),
                 'status': 'completed'
             }
-            logger.info(f"解析结果: {sample_name}")
+            logger.info(f"解析结果: {key}")
         else:
             logger.warning(f"未找到结果文件: {result_file}")
 
