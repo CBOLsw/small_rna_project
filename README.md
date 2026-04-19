@@ -196,9 +196,34 @@ python scripts/run_pipeline.py --config config/config.yaml --module motif     # 
 # 从失败处恢复执行
 python scripts/run_pipeline.py --config config/config.yaml --resume
 
-# 查看分析状态和结果
+# 查看流程执行状态（显示各模块完成情况）
 python scripts/run_pipeline.py --config config/config.yaml --status
+
+# 查看分析结果目录
 ls -lh results/
+```
+
+### 查看流程状态
+
+使用 `--status` 参数可以查看当前流程的执行状态，包括已完成的模块和待执行的模块：
+
+```bash
+# 查看流程状态
+python scripts/run_pipeline.py --config config/config.yaml --status
+```
+
+**预期输出示例：**
+```
+流程状态检查:
+  [✓] qc                       - 完成于 2026-04-19 12:41:02
+  [✓] alignment                - 完成于 2026-04-19 12:45:30
+  [ ] counts                   - 待执行
+  [ ] differential_expression  - 待执行
+  [ ] motif_analysis           - 待执行
+
+已完成: 2/5 个模块
+已完成模块: qc, alignment
+待完成模块: counts, differential_expression, motif_analysis
 ```
 
 ### 可用模块
