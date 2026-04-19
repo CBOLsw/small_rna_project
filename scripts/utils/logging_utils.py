@@ -9,10 +9,12 @@ import logging
 import sys
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 # 全局统一日志文件路径
 GLOBAL_LOG_FILE = None
+# 保存所有已创建的日志记录器
+_LOGGERS: List[logging.Logger] = []
 
 
 def configure_logging(
@@ -74,17 +76,26 @@ def configure_logging(
     root_logger = logging.getLogger()
     has_root_handlers = len(root_logger.handlers) > 0
 
-    # 如果需要全局统一日志，并且还没有配置过
-    if use_global_log and GLOBAL_LOG_FILE is not None and not has_root_handlers:
+    # 如果需要全局统一日志
+    if use_global_log and GLOBAL_LOG_FILE is not None:
         log_dir = Path(GLOBAL_LOG_FILE).parent
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        # 添加全局统一日志文件处理器
-        global_file_handler = logging.FileHandler(GLOBAL_LOG_FILE, encoding='utf-8')
-        global_file_handler.setLevel(level)
-        global_file_formatter = logging.Formatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
-        global_file_handler.setFormatter(global_file_formatter)
-        root_logger.addHandler(global_file_handler)
+        # 检查是否已有全局日志文件处理器
+        has_global_handler = False
+        for handler in root_logger.handlers:
+            if (isinstance(handler, logging.FileHandler) and
+                handler.baseFilename == str(Path(GLOBAL_LOG_FILE).resolve())):
+                has_global_handler = True
+                break
+
+        if not has_global_handler:
+            # 添加全局统一日志文件处理器
+            global_file_handler = logging.FileHandler(GLOBAL_LOG_FILE, encoding='utf-8')
+            global_file_handler.setLevel(level)
+            global_file_formatter = logging.Formatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
+            global_file_handler.setFormatter(global_file_formatter)
+            root_logger.addHandler(global_file_handler)
 
     # 如果指定了单独的日志文件，添加文件处理器
     if log_file and log_file != GLOBAL_LOG_FILE:
@@ -118,6 +129,37 @@ def set_global_log_file(log_file: str):
     global GLOBAL_LOG_FILE
     GLOBAL_LOG_FILE = log_file
 
+    # 为所有已创建的日志记录器添加全局日志文件处理器
+    log_dir = Path(GLOBAL_LOG_FILE).parent
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    # 创建统一的日志格式
+    log_format = ("%(asctime)s - %(levelname)-8s - [%(name)s] - "
+                  "%(process)d - %(thread)d - %(message)s")
+
+    # 创建文件处理器
+    global_file_handler = logging.FileHandler(GLOBAL_LOG_FILE, encoding='utf-8')
+    global_file_handler.setLevel(logging.INFO)
+    global_file_formatter = logging.Formatter(
+        log_format,
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    global_file_handler.setFormatter(global_file_formatter)
+
+    # 为所有已保存的日志记录器添加处理器
+    for logger in _LOGGERS:
+        # 检查是否已经有类似的处理器
+        has_global_handler = False
+        for handler in logger.handlers:
+            if (isinstance(handler, logging.FileHandler) and
+                handler.baseFilename == str(Path(GLOBAL_LOG_FILE).resolve())):
+                has_global_handler = True
+                break
+
+        if not has_global_handler:
+            logger.addHandler(global_file_handler)
+            logger.debug(f"已添加全局日志文件处理器到: {logger.name}")
+
 
 def get_logger(name: str, **kwargs) -> logging.Logger:
     """
@@ -130,7 +172,10 @@ def get_logger(name: str, **kwargs) -> logging.Logger:
     返回:
         配置好的日志记录器
     """
-    return configure_logging(name, **kwargs)
+    logger = configure_logging(name, **kwargs)
+    if logger not in _LOGGERS:
+        _LOGGERS.append(logger)
+    return logger
 
 
 def get_script_logger(script_name: str, log_dir: str = None, **kwargs) -> logging.Logger:
