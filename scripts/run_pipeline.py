@@ -26,7 +26,13 @@ import time
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 from datetime import datetime
-from tqdm import tqdm
+
+# 尝试导入tqdm，如果失败则禁用进度条功能
+try:
+    from tqdm import tqdm
+    TQDM_AVAILABLE = True
+except ImportError:
+    TQDM_AVAILABLE = False
 
 # 配置日志
 def setup_logging(log_file: str = None, verbose: bool = False) -> None:
@@ -138,7 +144,7 @@ def run_snakemake(config: Dict[str, Any],
     try:
         start_time = time.time()
 
-        if show_progress and not dry_run:
+        if show_progress and not dry_run and TQDM_AVAILABLE:
             logger.info("获取流程任务总数...")
             # 先执行dry-run来获取总任务数
             dry_run_cmd = cmd + ['--dry-run']
@@ -154,11 +160,18 @@ def run_snakemake(config: Dict[str, Any],
 
             if total_tasks > 0:
                 logger.info(f"总任务数: {total_tasks}")
+                # 使用Popen启动Snakemake进程
+                snakemake_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
                 # 使用tqdm显示进度条
                 with tqdm(total=total_tasks, desc="分析进度", unit="任务", ncols=80) as pbar:
                     # 实时监控已完成的任务
                     completed_tasks = 0
                     while True:
+                        # 检查Snakemake是否还在运行
+                        if snakemake_process.poll() is not None:
+                            break
+
                         # 检查当前已完成的任务数（通过检查输出文件）
                         current_completed = 0
                         results_dir = Path(config['directories']['results'])
@@ -200,21 +213,20 @@ def run_snakemake(config: Dict[str, Any],
                             pbar.update(current_completed - completed_tasks)
                             completed_tasks = current_completed
 
-                        # 检查Snakemake是否还在运行
-                        try:
-                            # 使用ps命令检查Snakemake进程
-                            ps_result = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
-                            if 'snakemake' not in ps_result.stdout:
-                                break
-                        except Exception:
-                            pass
-
                         time.sleep(5)
 
                     # 确保进度条显示到100%
                     if completed_tasks < total_tasks:
                         pbar.update(total_tasks - completed_tasks)
 
+                # 获取Snakemake的输出和返回码
+                stdout, stderr = snakemake_process.communicate()
+                if stdout:
+                    logger.debug(stdout)
+                if stderr:
+                    logger.error(stderr)
+
+                result = type('Result', (object,), {'returncode': snakemake_process.returncode})()
             else:
                 logger.warning("无法获取任务总数，将显示详细输出")
                 result = subprocess.run(cmd, check=False)
@@ -429,7 +441,7 @@ def main():
         resume=args.resume,
         cores=args.cores,
         verbose=args.verbose,
-        show_progress=not args.no_progress
+        show_progress=not args.no_progress and TQDM_AVAILABLE
     )
 
     logger.info("=" * 60)
