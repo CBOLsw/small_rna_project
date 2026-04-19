@@ -586,12 +586,13 @@ class BAMQualityAssessor:
         except Exception as e:
             logger.warning(f"绘制插入片段大小分布图时出错: {e}")
 
-    def generate_summary_report(self, output_dir: str) -> Optional[str]:
+    def generate_summary_report(self, output_dir: str, output_file: str = None) -> Optional[str]:
         """
         生成质量评估汇总报告
 
         参数:
             output_dir: 输出目录
+            output_file: 可选的输出文件路径
 
         返回:
             str: 报告文件路径
@@ -623,6 +624,13 @@ class BAMQualityAssessor:
             return None
 
         df = pd.DataFrame(summary_data)
+
+        if output_file:
+            # 直接保存到指定文件
+            csv_file = Path(output_file)
+            df.to_csv(csv_file, index=False)
+            logger.info(f"质量评估汇总已保存: {csv_file}")
+            return str(csv_file)
 
         # 保存CSV
         csv_file = output_dir / "bam_quality_summary.csv"
@@ -684,8 +692,12 @@ def parse_arguments():
 
     parser.add_argument(
         "--input", "-i",
-        required=True,
         help="输入BAM文件或包含BAM文件的目录"
+    )
+
+    parser.add_argument(
+        "--input-dir",
+        help="输入目录（与--input功能相同）"
     )
 
     parser.add_argument(
@@ -738,9 +750,24 @@ def main():
         sys.exit(1)
 
     # 处理输入
-    input_path = Path(args.input)
-    output_dir = Path(args.output)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if args.input_dir:
+        input_path = Path(args.input_dir)
+    elif args.input:
+        input_path = Path(args.input)
+    else:
+        logger.error("必须提供--input或--input-dir参数")
+        sys.exit(1)
+
+    # 处理输出路径
+    output_path = Path(args.output)
+    is_file_output = False
+    if output_path.suffix == '.csv':
+        is_file_output = True
+        output_dir = output_path.parent
+        output_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        output_dir = output_path
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     # 根据输入类型处理
     if args.sample_info:
@@ -788,11 +815,17 @@ def main():
 
     # 生成汇总报告
     if args.summary:
-        report_file = assessor.generate_summary_report(output_dir)
-        if report_file:
-            logger.info(f"质量评估完成，报告文件: {report_file}")
+        if is_file_output:
+            # 直接保存到指定的CSV文件
+            report_file = assessor.generate_summary_report(output_dir, str(output_path))
+            if report_file:
+                logger.info(f"质量评估完成，报告文件: {report_file}")
         else:
-            logger.warning("未能生成汇总报告")
+            report_file = assessor.generate_summary_report(output_dir)
+            if report_file:
+                logger.info(f"质量评估完成，报告文件: {report_file}")
+            else:
+                logger.warning("未能生成汇总报告")
 
     logger.info("BAM文件质量评估流程完成")
 
