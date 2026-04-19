@@ -205,7 +205,13 @@ ls -lh results/
 
 ### 查看流程状态
 
-使用 `--status` 参数可以查看当前流程的执行状态，包括已完成的模块和待执行的模块：
+使用 `--status` 参数可以查看当前流程的执行状态，包括已完成的模块和待执行的模块。
+
+**查看方法：**
+1. 在流程运行期间，可以**打开一个新的终端窗口**（不要关闭正在运行流程的终端）
+2. 进入项目目录：`cd /mnt/c/Users/24584/PycharmProjects/small_rna_project`
+3. 激活conda环境：`conda activate small_rna_analysis`
+4. 运行状态检查命令
 
 ```bash
 # 查看流程状态
@@ -225,6 +231,11 @@ python scripts/run_pipeline.py --config config/config.yaml --status
 已完成模块: qc, alignment
 待完成模块: counts, differential_expression, motif_analysis
 ```
+
+**说明：**
+- 可以随时在新终端中运行此命令，不会影响正在运行的流程
+- 状态检查是只读操作，不会修改任何文件
+- 如果流程已经结束，可以查看哪些模块成功完成，哪些需要重新运行
 
 ### 可用模块
 
