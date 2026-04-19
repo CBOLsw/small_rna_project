@@ -110,7 +110,7 @@ def run_snakemake(config: Dict[str, Any],
     # 设置全局统一日志文件
     log_dir = config['directories']['logs']
     pipeline_log_file = os.path.join(log_dir, 'pipeline.log')
-    from scripts.utils.logging_utils import set_global_log_file
+    from utils.logging_utils import set_global_log_file
     set_global_log_file(pipeline_log_file)
     logger.info(f"全局日志文件已设置为: {pipeline_log_file}")
 
