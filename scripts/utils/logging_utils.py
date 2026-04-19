@@ -11,6 +11,9 @@ import os
 from pathlib import Path
 from typing import Optional
 
+# 全局统一日志文件路径
+GLOBAL_LOG_FILE = None
+
 
 def configure_logging(
     name: str = None,
@@ -18,7 +21,8 @@ def configure_logging(
     log_file: Optional[str] = None,
     show_process: bool = True,
     show_thread: bool = True,
-    show_file: bool = False
+    show_file: bool = False,
+    use_global_log: bool = True
 ) -> logging.Logger:
     """
     配置统一的日志格式
@@ -30,10 +34,13 @@ def configure_logging(
         show_process: 是否显示进程ID
         show_thread: 是否显示线程ID
         show_file: 是否显示文件名和行号
+        use_global_log: 是否同时输出到全局统一日志文件
 
     返回:
         配置好的日志记录器
     """
+    global GLOBAL_LOG_FILE
+
     # 构建日志格式
     format_parts = [
         "%(asctime)s",
@@ -63,8 +70,24 @@ def configure_logging(
         datefmt="%Y-%m-%d %H:%M:%S"
     )
 
-    # 如果指定了日志文件，添加文件处理器
-    if log_file:
+    # 检查根记录器是否已有处理器
+    root_logger = logging.getLogger()
+    has_root_handlers = len(root_logger.handlers) > 0
+
+    # 如果需要全局统一日志，并且还没有配置过
+    if use_global_log and GLOBAL_LOG_FILE is not None and not has_root_handlers:
+        log_dir = Path(GLOBAL_LOG_FILE).parent
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        # 添加全局统一日志文件处理器
+        global_file_handler = logging.FileHandler(GLOBAL_LOG_FILE, encoding='utf-8')
+        global_file_handler.setLevel(level)
+        global_file_formatter = logging.Formatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
+        global_file_handler.setFormatter(global_file_formatter)
+        root_logger.addHandler(global_file_handler)
+
+    # 如果指定了单独的日志文件，添加文件处理器
+    if log_file and log_file != GLOBAL_LOG_FILE:
         log_dir = Path(log_file).parent
         log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -73,7 +96,7 @@ def configure_logging(
         file_formatter = logging.Formatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
         file_handler.setFormatter(file_formatter)
 
-        logging.getLogger().addHandler(file_handler)
+        root_logger.addHandler(file_handler)
 
     # 创建或获取日志记录器
     logger = logging.getLogger(name)
@@ -83,6 +106,17 @@ def configure_logging(
     logger.propagate = True
 
     return logger
+
+
+def set_global_log_file(log_file: str):
+    """
+    设置全局统一日志文件
+
+    参数:
+        log_file: 全局日志文件路径
+    """
+    global GLOBAL_LOG_FILE
+    GLOBAL_LOG_FILE = log_file
 
 
 def get_logger(name: str, **kwargs) -> logging.Logger:
@@ -120,7 +154,10 @@ def get_script_logger(script_name: str, log_dir: str = None, **kwargs) -> loggin
 
 # 测试用例
 if __name__ == "__main__":
-    # 测试1: 基础配置
+    # 测试1: 设置全局日志
+    set_global_log_file("pipeline.log")
+
+    # 测试2: 基础配置
     logger1 = get_logger("TestLogger")
     logger1.debug("调试信息")
     logger1.info("普通信息")
@@ -128,11 +165,11 @@ if __name__ == "__main__":
     logger1.error("错误信息")
     logger1.critical("严重错误")
 
-    # 测试2: 包含文件日志
+    # 测试3: 包含文件日志
     logger2 = get_logger("FileLogger", log_file="test.log")
     logger2.info("这是一条写入文件的日志")
 
-    # 测试3: 脚本专用配置
+    # 测试4: 脚本专用配置
     logger3 = get_script_logger("my_script", log_dir="logs")
     logger3.info("脚本运行信息")
 

@@ -24,12 +24,12 @@ import logging
 import json
 import yaml
 
+# 导入项目的日志配置工具
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.logging_utils import get_script_logger
+
 # 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = get_script_logger('count_features')
 
 
 class FeatureCounter:
@@ -350,12 +350,13 @@ class FeatureCounter:
             logger.warning(f"从计数文件解析汇总信息时出错: {e}")
             return {'assigned': 0, 'unassigned': 0, 'total': 0, 'assignment_rate': 0}
 
-    def generate_count_matrix(self, output_dir: str) -> Optional[str]:
+    def generate_count_matrix(self, output_dir: str, output_file: str = None) -> Optional[str]:
         """
         生成计数矩阵（所有样本的合并计数表）
 
         参数:
             output_dir: 输出目录
+            output_file: 可选的输出文件路径，如果提供则直接保存到该路径
 
         返回:
             str: 计数矩阵文件路径
@@ -420,22 +421,28 @@ class FeatureCounter:
             count_matrix = count_matrix.fillna(0).astype(int)
 
             # 保存计数矩阵
-            matrix_file = output_dir / "gene_count_matrix.csv"
+            if output_file:
+                matrix_file = Path(output_file)
+            else:
+                matrix_file = output_dir / "gene_count_matrix.csv"
+
             count_matrix.to_csv(matrix_file)
 
-            # 保存为TSV格式
-            tsv_file = output_dir / "gene_count_matrix.tsv"
-            count_matrix.to_csv(tsv_file, sep='\t')
+            # 只在没有指定输出文件时保存其他格式和报告
+            if not output_file:
+                # 保存为TSV格式
+                tsv_file = output_dir / "gene_count_matrix.tsv"
+                count_matrix.to_csv(tsv_file, sep='\t')
 
-            # 保存为Excel格式（可选）
-            try:
-                excel_file = output_dir / "gene_count_matrix.xlsx"
-                count_matrix.to_excel(excel_file)
-            except ImportError:
-                logger.warning("未安装openpyxl，跳过Excel格式导出")
+                # 保存为Excel格式（可选）
+                try:
+                    excel_file = output_dir / "gene_count_matrix.xlsx"
+                    count_matrix.to_excel(excel_file)
+                except ImportError:
+                    logger.warning("未安装openpyxl，跳过Excel格式导出")
 
-            # 生成统计报告
-            self._generate_matrix_report(count_matrix, output_dir)
+                # 生成统计报告
+                self._generate_matrix_report(count_matrix, output_dir)
 
             logger.info(f"计数矩阵已生成: {matrix_file}")
             logger.info(f"矩阵维度: {count_matrix.shape}")
@@ -591,8 +598,12 @@ def parse_arguments():
 
     parser.add_argument(
         "--input", "-i",
-        required=True,
         help="输入BAM文件或包含BAM文件的目录"
+    )
+
+    parser.add_argument(
+        "--bams",
+        help="输入BAM文件列表（可选，替代--input）"
     )
 
     parser.add_argument(
@@ -604,7 +615,7 @@ def parse_arguments():
     parser.add_argument(
         "--output", "-o",
         default="results/expression/counts",
-        help="输出目录 (默认: results/expression/counts)"
+        help="输出目录或CSV文件路径 (默认: results/expression/counts)"
     )
 
     parser.add_argument(
@@ -658,11 +669,17 @@ def main():
         sys.exit(1)
 
     # 处理输入
-    input_path = Path(args.input)
-    output_dir = Path(args.output)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = Path(args.output)
+    is_file_output = False
+    if output_path.suffix == '.csv':
+        is_file_output = True
+        output_dir = output_path.parent
+        output_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        output_dir = output_path
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 根据输入类型处理
+    # 处理输入参数
     if args.sample_info:
         # 使用样本信息CSV文件
         logger.info(f"使用样本信息文件: {args.sample_info}")
@@ -681,44 +698,77 @@ def main():
                     config=config
                 )
 
-    elif input_path.is_file() and input_path.suffix == '.bam':
-        # 单个BAM文件
-        counter.count_single_bam(
-            bam_file=str(input_path),
-            annotation_file=args.annotation,
-            output_dir=output_dir,
-            sample_name=None,
-            config=config
-        )
-
-    elif input_path.is_dir():
-        # 目录下的所有BAM文件
-        logger.info(f"扫描目录: {input_path}")
-        bam_files = list(input_path.glob("*.bam")) + list(input_path.glob("*.BAM"))
+    elif args.bams:
+        # 使用--bams参数
+        bam_files = args.bams.split()
+        logger.info(f"使用BAM文件列表: {len(bam_files)} 个文件")
 
         for bam_file in bam_files:
+            bam_path = Path(bam_file)
+            if bam_path.is_file() and bam_path.suffix == '.bam':
+                sample_name = bam_path.stem.replace('.sorted', '')
+                counter.count_single_bam(
+                    bam_file=str(bam_path),
+                    annotation_file=args.annotation,
+                    output_dir=output_dir,
+                    sample_name=sample_name,
+                    config=config
+                )
+
+    elif args.input:
+        # 使用--input参数
+        input_path = Path(args.input)
+
+        if input_path.is_file() and input_path.suffix == '.bam':
+            # 单个BAM文件
             counter.count_single_bam(
-                bam_file=str(bam_file),
+                bam_file=str(input_path),
                 annotation_file=args.annotation,
                 output_dir=output_dir,
                 sample_name=None,
                 config=config
             )
 
-    else:
-        logger.error("不支持的输入类型，请提供BAM文件、包含BAM文件的目录或样本信息CSV")
-        sys.exit(1)
+        elif input_path.is_dir():
+            # 目录下的所有BAM文件
+            logger.info(f"扫描目录: {input_path}")
+            bam_files = list(input_path.glob("*.bam")) + list(input_path.glob("*.BAM"))
+
+            for bam_file in bam_files:
+                counter.count_single_bam(
+                    bam_file=str(bam_file),
+                    annotation_file=args.annotation,
+                    output_dir=output_dir,
+                    sample_name=None,
+                    config=config
+                )
+
+        else:
+            logger.error("不支持的输入类型，请提供BAM文件、包含BAM文件的目录或样本信息CSV")
+            sys.exit(1)
 
     # 生成计数矩阵
     if args.matrix:
-        matrix_file = counter.generate_count_matrix(output_dir)
-        if matrix_file:
-            logger.info(f"计数矩阵已生成: {matrix_file}")
+        if is_file_output:
+            # 直接保存到指定的CSV文件
+            matrix_file = counter.generate_count_matrix(
+                output_dir=output_dir,
+                output_file=str(output_path)
+            )
+            if matrix_file:
+                logger.info(f"计数矩阵已保存到: {matrix_file}")
+            else:
+                logger.warning("未能生成计数矩阵")
         else:
-            logger.warning("未能生成计数矩阵")
+            # 保存到默认位置
+            matrix_file = counter.generate_count_matrix(output_dir)
+            if matrix_file:
+                logger.info(f"计数矩阵已生成: {matrix_file}")
+            else:
+                logger.warning("未能生成计数矩阵")
 
     # 生成汇总报告
-    if args.summary:
+    if args.summary and not is_file_output:
         report_file = counter.generate_summary_report(output_dir)
         if report_file:
             logger.info(f"基因计数完成，报告文件: {report_file}")

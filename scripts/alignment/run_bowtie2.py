@@ -316,7 +316,11 @@ class Bowtie2Aligner:
 
         # 质量参数
         if config.get('phred'):
-            params.extend(["--phred", str(config['phred'])])
+            phred = config['phred']
+            if phred == 33:
+                params.append("--phred33")
+            elif phred == 64:
+                params.append("--phred64")
 
         # 比对参数
         if config.get('sensitive'):

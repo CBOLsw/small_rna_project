@@ -26,13 +26,10 @@ import json
 # 导入压缩文件处理工具
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.compression_utils import ensure_uncompressed
+from utils.logging_utils import get_script_logger
 
 # 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = get_script_logger('build_bowtie2_index')
 
 
 class Bowtie2IndexBuilder:

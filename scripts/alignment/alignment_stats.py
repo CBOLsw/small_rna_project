@@ -24,12 +24,12 @@ import logging
 import json
 import yaml
 
+# 导入项目的日志配置工具
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.logging_utils import get_script_logger
+
 # 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = get_script_logger('alignment_stats')
 
 
 class AlignmentStatsCalculator:
@@ -371,7 +371,7 @@ def parse_arguments():
     parser.add_argument(
         "--output", "-o",
         default="results/alignment/stats",
-        help="输出目录 (默认: results/alignment/stats)"
+        help="输出目录或CSV文件路径 (默认: results/alignment/stats)"
     )
 
     parser.add_argument(
@@ -413,8 +413,17 @@ def main():
 
     # 处理输入
     input_path = Path(args.input)
-    output_dir = Path(args.output)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = Path(args.output)
+
+    # 判断输出是文件还是目录
+    is_file_output = False
+    if output_path.suffix == '.csv':
+        is_file_output = True
+        output_dir = output_path.parent
+        output_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        output_dir = output_path
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     # 根据输入类型处理
     if args.sample_info:
@@ -461,18 +470,34 @@ def main():
         logger.error("不支持的输入类型")
         sys.exit(1)
 
-    # 保存每个样本的统计
-    for sample, stats in calculator.results.items():
-        if stats.get('success'):
-            calculator.save_stats(stats, output_dir)
+    # 处理输出
+    if is_file_output:
+        # 直接输出到CSV文件
+        logger.info(f"直接保存到CSV文件: {output_path}")
+        if len(calculator.results) > 0:
+            # 获取第一个样本的统计结果
+            first_sample = next(iter(calculator.results.values()))
+            if first_sample.get('success'):
+                # 转换为DataFrame并保存到CSV
+                df = pd.DataFrame([first_sample])
+                df.to_csv(output_path, index=False)
+                logger.info(f"统计结果已保存到: {output_path}")
+            else:
+                logger.error("统计计算失败，无法保存到CSV文件")
+                sys.exit(1)
+    else:
+        # 输出到目录
+        for sample, stats in calculator.results.items():
+            if stats.get('success'):
+                calculator.save_stats(stats, output_dir)
 
-    # 生成汇总报告
-    if args.summary:
-        report_file = calculator.generate_summary_report(output_dir)
-        if report_file:
-            logger.info(f"比对统计完成，报告文件: {report_file}")
-        else:
-            logger.warning("未能生成汇总报告")
+        # 生成汇总报告
+        if args.summary:
+            report_file = calculator.generate_summary_report(output_dir)
+            if report_file:
+                logger.info(f"比对统计完成，报告文件: {report_file}")
+            else:
+                logger.warning("未能生成汇总报告")
 
     logger.info("比对统计流程完成")
 
