@@ -40,3 +40,4 @@ dependencies:
     - seaborn==0.13.0
     - jupyter==1.0.0
     - notebook==7.0.6
+    - tqdm==4.66.1

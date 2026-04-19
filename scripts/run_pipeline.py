@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 from datetime import datetime
+from tqdm import tqdm
 
 # 配置日志
 def setup_logging(log_file: str = None, verbose: bool = False) -> None:
@@ -81,7 +82,8 @@ def run_snakemake(config: Dict[str, Any],
                   dry_run: bool = False,
                   resume: bool = False,
                   cores: int = None,
-                  verbose: bool = False) -> int:
+                  verbose: bool = False,
+                  show_progress: bool = True) -> int:
     """
     运行Snakemake流程
 
@@ -92,6 +94,7 @@ def run_snakemake(config: Dict[str, Any],
         resume: 是否从上次失败处恢复
         cores: 使用的核心数
         verbose: 是否详细输出
+        show_progress: 是否显示进度条
 
     返回:
         int: Snakemake退出码
@@ -134,7 +137,91 @@ def run_snakemake(config: Dict[str, Any],
 
     try:
         start_time = time.time()
-        result = subprocess.run(cmd, check=False)
+
+        if show_progress and not dry_run:
+            logger.info("获取流程任务总数...")
+            # 先执行dry-run来获取总任务数
+            dry_run_cmd = cmd + ['--dry-run']
+            dry_run_result = subprocess.run(dry_run_cmd, capture_output=True, text=True)
+
+            total_tasks = 0
+            if dry_run_result.returncode == 0:
+                # 解析dry-run输出获取任务数
+                # Snakemake dry-run的输出格式包含类似"rule run_trimmomatic: ..."的行
+                for line in dry_run_result.stdout.splitlines():
+                    if line.strip().startswith('rule '):
+                        total_tasks += 1
+
+            if total_tasks > 0:
+                logger.info(f"总任务数: {total_tasks}")
+                # 使用tqdm显示进度条
+                with tqdm(total=total_tasks, desc="分析进度", unit="任务", ncols=80) as pbar:
+                    # 实时监控已完成的任务
+                    completed_tasks = 0
+                    while True:
+                        # 检查当前已完成的任务数（通过检查输出文件）
+                        current_completed = 0
+                        results_dir = Path(config['directories']['results'])
+
+                        # 检查各模块的输出文件
+                        if results_dir.exists():
+                            # QC模块
+                            if (results_dir / 'qc').exists():
+                                qc_files = list((results_dir / 'qc').glob('*_fastqc.html'))
+                                current_completed += len(qc_files)
+
+                            # 修剪后的fastq文件
+                            if (results_dir / '..' / 'processed').exists():
+                                processed_files = list((results_dir / '..' / 'processed').glob('*_trimmed.fastq.gz'))
+                                current_completed += len(processed_files)
+
+                            # 比对结果
+                            if (results_dir / 'alignment').exists():
+                                alignment_files = list((results_dir / 'alignment').glob('*.sorted.bam'))
+                                current_completed += len(alignment_files)
+
+                            # 计数结果
+                            if (results_dir / 'counts').exists():
+                                counts_files = list((results_dir / 'counts').glob('*.csv'))
+                                current_completed += len(counts_files)
+
+                            # 差异表达分析结果
+                            if (results_dir / 'differential_expression').exists():
+                                de_files = list((results_dir / 'differential_expression').glob('*.csv')) + list((results_dir / 'differential_expression').glob('*.png'))
+                                current_completed += len(de_files)
+
+                            # Motif分析结果
+                            if (results_dir / 'motif_analysis').exists():
+                                motif_files = list((results_dir / 'motif_analysis').glob('*.csv')) + list((results_dir / 'motif_analysis').glob('*.json'))
+                                current_completed += len(motif_files)
+
+                        # 更新进度条
+                        if current_completed > completed_tasks:
+                            pbar.update(current_completed - completed_tasks)
+                            completed_tasks = current_completed
+
+                        # 检查Snakemake是否还在运行
+                        try:
+                            # 使用ps命令检查Snakemake进程
+                            ps_result = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
+                            if 'snakemake' not in ps_result.stdout:
+                                break
+                        except Exception:
+                            pass
+
+                        time.sleep(5)
+
+                    # 确保进度条显示到100%
+                    if completed_tasks < total_tasks:
+                        pbar.update(total_tasks - completed_tasks)
+
+            else:
+                logger.warning("无法获取任务总数，将显示详细输出")
+                result = subprocess.run(cmd, check=False)
+        else:
+            # 如果不显示进度条或dry-run，直接执行
+            result = subprocess.run(cmd, check=False)
+
         end_time = time.time()
 
         elapsed_time = end_time - start_time
@@ -267,6 +354,8 @@ def main():
                        help='显示详细输出')
     parser.add_argument('--list-modules', action='store_true',
                        help='列出所有可用模块')
+    parser.add_argument('--no-progress', action='store_true',
+                       help='禁用进度条显示')
 
     args = parser.parse_args()
 
@@ -339,7 +428,8 @@ def main():
         dry_run=args.dry_run,
         resume=args.resume,
         cores=args.cores,
-        verbose=args.verbose
+        verbose=args.verbose,
+        show_progress=not args.no_progress
     )
 
     logger.info("=" * 60)
