@@ -21,6 +21,45 @@
 - **Python 3.9+**: 数据分析和脚本编写
 - **R 4.3+**: 统计分析和可视化
 
+## 项目结构
+
+```
+small_rna_project/
+├── data/                           # 数据目录
+│   ├── raw_fastq/                 # 原始fastq测序文件
+│   │   └── fastq_files/           # FASTQ文件目录
+│   ├── processed/                 # 处理后的中间文件
+│   └── metadata/                  # 样本信息文件
+├── references/                    # 参考基因组文件
+│   ├── *.fa                       # 参考基因组
+│   ├── *.gtf                      # 基因注释
+│   ├── *.mirbase.gff3             # miRBase注释
+│   └── bowtie2_index/             # Bowtie2索引目录（运行时生成）
+├── scripts/                       # 分析脚本目录
+│   ├── qc/                       # 质量控制脚本
+│   ├── alignment/                # 序列比对脚本
+│   ├── expression/               # 基因表达分析脚本
+│   ├── motif/                    # Motif分析脚本
+│   ├── setup/                    # 环境设置和工具下载脚本
+│   │   ├── install_everything.sh    # 一键安装脚本
+│   │   ├── install_bioc_packages.sh # R包安装脚本
+│   │   └── setup_complete.sh        # 完整环境安装脚本
+│   └── utils/                    # 工具和辅助脚本
+│       ├── download_references.py   # 参考基因组下载脚本
+│       └── final_check.py           # 项目状态检查脚本
+├── workflow/                       # Snakemake流程定义
+├── config/                        # 配置文件
+├── envs/                          # Conda环境配置
+├── results/                       # 分析结果目录
+│   ├── qc/                       # 质量控制结果
+│   ├── alignment/                # 序列比对结果
+│   ├── counts/                   # 基因计数结果
+│   ├── differential_expression/  # 差异表达分析结果
+│   └── motif_analysis/           # Motif分析结果
+├── logs/                         # 运行日志
+└── reports/                      # 分析报告
+```
+
 ## 快速开始（WSL2/Linux）
 
 ### 一键安装（推荐）
@@ -39,7 +78,7 @@ chmod +x scripts/setup/install_everything.sh
 ```
 
 **脚本会自动执行：**
-1. 检查系统环境和conda版本（如果发现Windows conda会提示用户）
+1. 检查系统环境和conda版本
 2. 自动安装Linux版Miniconda（如果需要）
 3. 创建项目目录结构
 4. 检查并下载参考基因组（如果不存在）
@@ -47,123 +86,73 @@ chmod +x scripts/setup/install_everything.sh
 6. 安装Bioconductor包
 7. 检查项目状态
 
-**安全机制：**
-- 自动检测并警告Windows conda
-- 提供选择：继续或安装Linux版conda
-- 默认推荐使用Linux版conda以确保工具正常工作
+### 手动环境配置
+
+如果一键安装失败或需要手动操作：
+
+```bash
+# 1. 安装Miniconda（如果未安装）
+cd ~
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+bash miniconda.sh -b -p $HOME/miniconda
+eval "$($HOME/miniconda/bin/conda shell.bash hook)"
+conda init bash
+exec bash
+
+# 2. 创建conda环境
+cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
+conda env create -f envs/small_rna_analysis.yaml
+
+# 3. 激活环境
+conda activate small_rna_analysis
+
+# 4. 安装R包
+bash scripts/setup/install_bioc_packages.sh
+
+# 5. 下载参考基因组（如果需要）
+python scripts/utils/download_references.py
+
+# 6. 检查项目状态
+python scripts/utils/final_check.py
+```
 
 ---
 
-## 参考资源下载（如需手动更新）
+## 数据准备
 
-#### 1. hg38参考基因组序列
-**可用源：UCSC官方源**
-- **下载地址**：https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
-- **目标文件**：`references/hg38.fa`
-- **操作步骤**：
-  ```bash
-  cd references
-  wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
-  gunzip hg38.fa.gz
-  ```
-
-#### 2. hg38基因注释文件
-**可用源：UCSC官方源**
-- **下载地址**：https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz
-- **目标文件**：`references/hg38.gtf`
-- **操作步骤**：
-  ```bash
-  cd references
-  wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz
-  gunzip hg38.knownGene.gtf.gz
-  mv hg38.knownGene.gtf hg38.gtf
-  ```
-
-#### 3. miRBase small RNA注释（可选）
-- **下载地址**：https://www.mirbase.org/ftp/CURRENT/genomes/hsa.gff3
-- **备用地址**：ftp://mirbase.org/pub/mirbase/CURRENT/genomes/hsa.gff3
-- **目标文件**：`references/hg38.mirbase.gff3`
-- **操作步骤**：
-  ```bash
-  cd references
-  wget https://www.mirbase.org/ftp/CURRENT/genomes/hsa.gff3
-  mv hsa.gff3 hg38.mirbase.gff3
-  ```
-
-#### 4. 测序数据文件（必须）
+### 1. 测序数据文件
 将您的fastq.gz测序文件放到：
 - **目标目录**：`data/raw_fastq/fastq_files/`
 
 **示例文件名**：
 ```
 HeLa-GAO1_S87_L002_R1_001.fastq.gz
-HeLa-GAO1_S87_L002_R2_001.fastq.gz
 HeLa-GAO2_S58_L004_R1_001.fastq.gz
-HeLa-GAO2_S58_L004_R2_001.fastq.gz
+HeLa-PAL1_S51_L001_R1_001.fastq.gz
+HeLa-PAL2_S52_L001_R1_001.fastq.gz
 ...
 ```
 
-**文件检查**：
-下载完成后，运行以下命令检查文件完整性：
+### 2. 参考基因组
+如果需要手动更新参考基因组：
+
 ```bash
+# hg38参考基因组序列
+cd references
+wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
+gunzip hg38.fa.gz
+
+# hg38基因注释文件
+wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz
+gunzip hg38.knownGene.gtf.gz
+mv hg38.knownGene.gtf hg38.gtf
+
+# 文件检查
 ls -lh references/
 ls -lh data/raw_fastq/fastq_files/
 ```
 
 ---
-
-## WSL2环境故障排除
-
-**说明：本章节仅在您遇到以下问题时使用**
-
-- 使用了Windows的conda导致的环境问题
-- 在WSL2中看到Windows的conda环境
-
-### 问题1：WSL2中使用了Windows的conda
-
-**症状：**
-- `which conda` 显示 `/mnt/c/Users/.../conda.exe`
-- 安装的工具无法在WSL2中正常运行
-
-**解决方案：在WSL2中安装Linux版Miniconda**
-
-```bash
-# 1. 在WSL2中下载并安装Linux版Miniconda
-cd ~
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-
-# 2. 安装（使用WSL2的默认位置）
-bash miniconda.sh -b -p $HOME/miniconda
-
-# 3. 初始化conda（在WSL2的bash shell中）
-eval "$($HOME/miniconda/bin/conda shell.bash hook)"
-conda init bash
-
-# 4. 重新打开终端（或 source ~/.bashrc）
-exec bash
-
-# 5. 创建项目的conda环境
-cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
-conda env create -f envs/small_rna_analysis.yaml
-
-# 6. 激活环境
-conda activate small_rna_analysis
-```
-
-### 问题2：快速创建备用环境
-
-如果不想重新安装，尝试在WSL2中创建Linux版环境：
-
-```bash
-conda create -n small_rna_analysis_linux python=3.9 -c bioconda trimmomatic=0.39 fastqc bowtie2 samtools
-```
-
-### 如何判断conda环境是否正确
-
-**正确的WSL2 conda特征：**
-- `which conda` 应该指向WSL2的路径，如 `/home/你的用户名/miniconda/bin/conda`
-- `conda info --envs` 显示的路径应该是 `/home/你的用户名/miniconda/envs/`
-- `conda list trimmomatic` 应该显示 `trimmomatic 0.39`
 
 ## 分析流程操作
 
@@ -176,7 +165,7 @@ conda activate small_rna_analysis
 # 2. 进入项目目录
 cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
 
-# 3. 检查项目状态
+# 3. 检查项目状态和配置
 python scripts/run_pipeline.py --config config/config.yaml --check
 
 # 4. 查看将要执行的步骤
@@ -204,189 +193,96 @@ python scripts/run_pipeline.py --config config/config.yaml --status
 ls -lh results/
 ```
 
+### 可用模块
+
+| 模块名 | 说明 |
+|---------|------|
+| all | 运行完整分析流程（默认） |
+| check | 仅运行项目状态检查 |
+| qc | 仅运行数据质量控制模块 |
+| alignment | 仅运行序列比对模块 |
+| counts | 仅运行基因计数模块 |
+| de | 仅运行差异表达分析模块 |
+| motif | 仅运行motif分析模块 |
+
+---
+
 ## 分析流程
 
 项目会自动执行以下分析步骤：
 
-1. **数据质量检查** - 检查测序数据的质量
-2. **序列修剪** - 去除低质量的序列和接头
-3. **序列比对** - 将测序序列比对到参考基因组
-4. **基因计数** - 统计每个基因的序列数量
-5. **差异表达分析** - 找出GAO组和PAL组之间表达量有显著差异的基因
-6. **Motif发现** - 发现差异表达基因中可能的调控序列模式
-
-## 项目数据
-
-### 原始数据
-- fastq.gz测序文件，位置：`data/raw_fastq/fastq_files/`
-- 样本信息：`data/metadata/sample_info.csv`
-
-**样本分组：**
-- GAO组：GAO_1, GAO_2, GAO_3
-- PAL组：PAL_1, PAL_2, PAL_3
-
-### 参考数据
-- 参考基因组：`references/*.fa`
-- 基因注释：`references/*.gtf`
-- Bowtie2索引：`references/bowtie2_index/`（运行时生成）
-
-## 项目依赖的配置文件
-
-- `config/config.yaml`: 分析流程参数配置
-- `envs/small_rna_analysis.yaml`: Conda环境配置
-
-## 项目目录详细说明
-
-```
-small_rna_project/
-├── data/
-│   ├── raw_fastq/                    # 原始测序数据
-│   │   └── fastq_files/              # FASTQ文件目录
-│   ├── processed/                    # 处理后的中间数据
-│   └── metadata/                     # 样本信息和分组信息
-├── references/                       # 参考基因组和注释文件
-│   ├── *.fa                       # 参考基因组
-│   ├── *.gtf                      # 基因注释
-│   ├── *.mirbase.gff3             # miRBase注释
-│   └── bowtie2_index/                # Bowtie2索引目录
-├── scripts/                          # 分析脚本
-│   ├── qc/                          # 质量控制脚本
-│   ├── alignment/                  # 序列比对脚本
-│   ├── expression/                 # 基因表达分析脚本
-│   ├── motif/                      # Motif分析脚本
-│   ├── setup/                      # 环境设置和工具下载脚本
-│   │   ├── install_everything.sh    # 一键安装脚本
-│   │   ├── install_bioc_packages.sh # R包安装脚本
-│   │   └── setup_complete.sh        # 完成设置脚本
-│   └── utils/                      # 工具和辅助脚本
-│       ├── download_references.py   # 参考基因组下载脚本
-│       └── final_check.py           # 项目状态检查脚本
-├── workflow/                        # Snakemake流程定义
-├── config/                          # 配置文件
-├── envs/                           # Conda环境配置
-├── results/                        # 分析结果
-│   ├── qc/
-│   ├── alignment/
-│   ├── counts/
-│   ├── differential_expression/
-│   └── motif_analysis/
-└── logs/                          # 运行日志
-```
+1. **数据质量检查** - 使用FastQC检查测序数据的质量
+2. **序列修剪** - 使用Trimmomatic去除低质量序列和接头
+3. **序列比对** - 使用Bowtie2将测序序列比对到参考基因组
+4. **基因计数** - 使用featureCounts统计每个基因的序列数量
+5. **差异表达分析** - 使用DESeq2找出GAO组和PAL组之间的差异表达基因
+6. **Motif发现** - 使用MEME Suite发现差异表达基因中的调控序列模式
 
 ## 结果输出
 
 分析结果会保存在以下目录：
 
-- `results/qc/` - 数据质量检查结果
-- `results/alignment/` - 序列比对结果
-- `results/counts/` - 基因计数结果
-- `results/differential_expression/` - 差异表达分析结果
-- `results/motif_analysis/` - Motif发现结果
+- `results/qc/` - 数据质量检查结果（FastQC报告）
+- `results/alignment/` - 序列比对结果（BAM文件和统计信息）
+- `results/counts/` - 基因计数结果（表达矩阵）
+- `results/differential_expression/` - 差异表达分析结果（DEGs列表、火山图、热图）
+- `results/motif_analysis/` - Motif发现结果（MEME结果、TomTom比较、可视化）
 
-## 参数配置指南
+---
 
-本项目的所有参数都可以在 `config/config.yaml` 文件中进行修改。以下是详细的参数说明：
+## 参数配置
 
-### 1. 样本信息配置
-| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
-|------|--------|-----------------|------|----------|
-| 元数据文件 | `data/metadata/sample_info.csv` | `data/metadata/new_samples.csv` | 样本信息CSV文件路径 | `samples.metadata_file` |
-| 分组列名 | `group` | `condition`, `treatment` | 样本分组的列名 | `samples.group_column` |
-| 样本列名 | `sample` | `sample_id`, `id` | 样本ID的列名 | `samples.sample_column` |
-| 分组列表 | `["GAO", "PAL"]` | `["Control", "Treatment"]`, `["WT", "KO"]` | 比较的实验组名称 | `samples.groups` |
+### 主要配置文件
 
-### 2. 参考基因组配置
-| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
-|------|--------|-----------------|------|----------|
-| 参考基因组序列 | `references/hg38.fa` | `references/mm10.fa`, `references/rn6.fa` | hg38参考基因组FASTA文件 | `reference.genome_fasta` |
-| Bowtie2索引 | `references/bowtie2_index/hg38` | `references/bowtie2_index/mm10` | Bowtie2索引前缀 | `reference.bowtie2_index` |
-| 基因注释文件 | `references/hg38.gtf` | `references/mm10.gtf`, `references/rn6.gtf` | GTF格式基因注释 | `reference.gtf_annotation` |
+项目的所有参数都可以在 `config/config.yaml` 文件中进行修改：
 
-### 3. 质量控制参数
-| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
-|------|--------|-----------------|------|----------|
-| Trimmomatic线程数 | 4 | `2`, `8`, `16` | 并行处理线程数 | `quality_control.trimmomatic.threads` |
-| 前端质量阈值 | 3 | `2`, `5`, `10` | 切除5'端低于此质量的碱基 | `quality_control.trimmomatic.leading` |
-| 末端质量阈值 | 3 | `2`, `5`, `10` | 切除3'端低于此质量的碱基 | `quality_control.trimmomatic.trailing` |
-| 滑动窗口 | `4:15` | `3:10`, `5:20` | 窗口大小:平均质量阈值 | `quality_control.trimmomatic.slidingwindow` |
-| 最小序列长度 | 18 | `15`, `20`, `25` | 保留的最短序列长度 | `quality_control.trimmomatic.minlen` |
-
-### 4. 序列比对参数
-| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
-|------|--------|-----------------|------|----------|
-| Bowtie2线程数 | 8 | `4`, `12`, `16` | 比对线程数 | `alignment.bowtie2.threads` |
-| 比对模式 | `very-sensitive-local` | `sensitive-local`, `very-fast-local` | 比对预设模式 | `alignment.bowtie2.preset` |
-| 种子长度 | 15 | `10`, `20` | 种子序列长度 | `alignment.bowtie2.seed_length` |
-| 最大错配数 | 1 | `0`, `2` | 允许的最大错配数 | `alignment.bowtie2.max_mismatches` |
-| 报告比对数 | 10 | `5`, `20` | 最多报告的比对位置数 | `alignment.bowtie2.k` |
-
-### 5. 基因计数参数
-| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
-|------|--------|-----------------|------|----------|
-| featureCounts线程数 | 8 | `4`, `12`, `16` | 计数线程数 | `counting.featureCounts.threads` |
-| 链特异性 | 0 | `1`, `2` | 0=无链,1=有链,2=反向链 | `counting.featureCounts.strandness` |
-| 最小重叠 | 1 | `5`, `10`, `20` | 最小重叠碱基数 | `counting.featureCounts.min_overlap` |
-| 多重比对计数 | false | `true` | 是否计数多重比对序列 | `counting.featureCounts.count_multi_mapping` |
-
-### 6. 差异表达分析参数
-| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
-|------|--------|-----------------|------|----------|
-| 调整p值阈值 | 0.05 | `0.01`, `0.1` | 差异表达显著性阈值 | `differential_expression.deseq2.padj_threshold` |
-| log2倍数变化阈值 | 1.0 | `0.5`, `1.5`, `2.0` | 表达变化倍数阈值 | `differential_expression.deseq2.log2fc_threshold` |
-| 收缩效应 | true | `false` | 是否使用效应量收缩 | `differential_expression.deseq2.shrinkage` |
-
-### 7. Motif分析参数
-| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
-|------|--------|-----------------|------|----------|
-| 最小motif宽度 | 6 | `4`, `8` | 最短motif长度 | `motif_analysis.meme.min_width` |
-| 最大motif宽度 | 12 | `10`, `15`, `20` | 最长motif长度 | `motif_analysis.meme.max_width` |
-| 最大motif数 | 10 | `5`, `20`, `50` | 最多发现的motif数量 | `motif_analysis.meme.max_motifs` |
-| E-value阈值 | 1e-4 | `1e-3`, `1e-5` | Motif显著性阈值 | `motif_analysis.meme.evalue_threshold` |
-| MEME线程数 | 8 | `4`, `12`, `16` | Motif分析线程数 | `motif_analysis.meme.threads` |
-| Tomtom数据库 | `JASPAR_vertebrates` | `HOCOMOCOv11_core`, `UNIPROBE` | Motif比对数据库 | `motif_analysis.tomtom.database` |
-
-### 8. 执行参数
-| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
-|------|--------|-----------------|------|----------|
-| Snakemake核心数 | 8 | `4`, `12`, `16`, `all` | 并行执行的最大核心数 | `snakemake.cores` |
-| 等待时间 | 60 | `30`, `120`, `300` | 文件生成等待时间(秒) | `snakemake.latency_wait` |
-| 重试次数 | 2 | `1`, `3`, `5` | 失败任务重试次数 | `snakemake.restart_times` |
-| 出错继续 | true | `false` | 某个任务失败时是否继续 | `snakemake.keep_going` |
-
-### 9. 可视化参数
-| 参数 | 默认值 | 取值示例/推荐值 | 说明 | 修改位置 |
-|------|--------|-----------------|------|----------|
-| 图片DPI | 300 | `150`, `600` | 输出图片分辨率 | `visualization.dpi` |
-| 图片格式 | `png` | `pdf`, `svg`, `jpg` | 输出图片格式 | `visualization.figure_format` |
-| 颜色方案 | `Set2` | `viridis`, `Paired`, `tab10` | 绘图颜色调色板 | `visualization.color_palette` |
-
-### 配置文件修改示例
-
-如需修改参数，编辑 `config/config.yaml` 文件：
-
+#### 1. 样本信息配置
 ```yaml
-# 示例：修改差异表达分析阈值
-differential_expression:
-  deseq2:
-    padj_threshold: 0.01        # 将显著性阈值改为0.01
-    log2fc_threshold: 1.5        # 将倍数变化阈值改为1.5
+samples:
+  metadata_file: "data/metadata/sample_info.csv"
+  group_column: "group"
+  sample_column: "sample"
+  groups:
+    - "GAO"
+    - "PAL"
 ```
 
-## 技术实现细节
+#### 2. 质量控制参数
+```yaml
+quality_control:
+  trimmomatic:
+    threads: 4
+    leading: 3
+    trailing: 3
+    slidingwindow: "4:15"
+    minlen: 18
+    adapter_file: "config/VAHTS-SmallRNA-V2.fa"
+    adapter_type: "vahts_small_rna_v2"
+```
 
-### 关键参数设置
-- Trimmomatic修剪参数：LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:18
-- Bowtie2比对参数：very-sensitive-local，适合small RNA测序
-- DESeq2分析参数：padj&lt;0.05，log2FC&gt;1.0
-- MEME motif长度：6-12个碱基对
+#### 3. 差异表达分析参数
+```yaml
+differential_expression:
+  deseq2:
+    padj_threshold: 0.05
+    log2fc_threshold: 1.0
+    shrinkage: true
+```
 
-### 分析统计阈值
-- 差异表达基因筛选：padj &lt; 0.05，|log2FC| &gt; 1.0
-- Motif显著性：E-value &lt; 1e-4
+#### 4. 执行参数
+```yaml
+snakemake:
+  cores: 8
+  latency_wait: 60
+  restart_times: 2
+  keep_going: true
+```
+
+---
 
 ## 常见问题
 
-### 问：如何检查项目状态和配置？
+### 1. 如何检查项目状态和配置？
 
 ```bash
 # 运行项目状态检查，确认配置正确
@@ -396,14 +292,14 @@ python scripts/utils/final_check.py
 python scripts/run_pipeline.py --config config/config.yaml --check
 ```
 
-### 问：如何运行分析？
+### 2. 如何运行分析？
 
 ```bash
 conda activate small_rna_analysis
 snakemake --cores 4 --configfile config/config.yaml
 ```
 
-### 问：如何只运行部分分析？
+### 3. 如何只运行部分分析？
 
 ```bash
 # 只运行质量控制
@@ -413,20 +309,41 @@ snakemake --cores 4 --configfile config/config.yaml results/qc/qc_summary.csv
 snakemake --cores 4 --configfile config/config.yaml results/differential_expression/deseq2_results.csv
 ```
 
-### 问：需要多少磁盘空间？
+### 4. 需要多少磁盘空间？
 
 建议至少准备20GB的可用空间，中间文件会占用较多空间。
 
-### 问：运行需要多长时间？
+### 5. 运行需要多长时间？
 
 使用4个CPU核心，完整分析大约需要2-3小时。如果使用8个核心，时间会缩短。
 
-### 问：系统要求是什么？
+### 6. 系统要求是什么？
 
 - **操作系统**：Windows 10/11（使用WSL2）或 Linux
 - **内存**：至少8GB RAM（推荐16GB）
 - **磁盘空间**：至少20GB可用空间
 - **CPU**：至少4个核心（推荐8个或更多）
+
+---
+
+## 技术实现细节
+
+### 关键设计决策
+
+1. **比对工具**: Bowtie2（针对small RNA短序列优化）
+2. **差异表达分析**: DESeq2（适合小样本量）
+3. **motif发现**: MEME Suite（行业标准）
+4. **流程管理**: Snakemake（声明式语法，支持并行）
+5. **参数管理**: 集中式配置文件 (`config/config.yaml`)
+
+### 关键参数设置
+
+- Trimmomatic修剪参数：LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:18
+- Bowtie2比对参数：very-sensitive-local，适合small RNA测序
+- DESeq2分析参数：padj<0.05，log2FC>1.0
+- MEME motif长度：6-12个碱基对
+
+---
 
 ## 许可证
 

@@ -181,3 +181,4 @@ references/
 *~
 .DS_Store
 Thumbs.db
+.snakemake/

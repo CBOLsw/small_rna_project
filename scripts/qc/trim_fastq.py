@@ -281,30 +281,47 @@ class TrimmomaticProcessor:
         steps = []
 
         # 1. 接头去除 (针对small RNA优化)
+        adapter_file = config.get('adapter_file', None)
         adapter = config.get('adapter', 'illumina_small_rna')
         adapter_seq = self.ADAPTERS.get(adapter, adapter)
-        steps.extend(["ILLUMINACLIP", f"{adapter_seq}:2:30:10"])
+
+        if adapter_file and Path(adapter_file).exists():
+            # 使用配置文件中指定的接头文件
+            steps.append(f"ILLUMINACLIP:{adapter_file}:2:30:10")
+        else:
+            # 使用内置接头序列（注意：Trimmomatic通常需要接头文件，但我们可以尝试直接使用序列）
+            # 首先检查是否有默认的接头文件
+            default_adapter_file = "config/VAHTS-SmallRNA-V2.fa"
+            if Path(default_adapter_file).exists():
+                steps.append(f"ILLUMINACLIP:{default_adapter_file}:2:30:10")
+            else:
+                logger.warning(f"未找到接头文件 {default_adapter_file}，将使用内置接头序列")
+                # 对于直接使用序列的情况，需要创建临时接头文件
+                temp_adapter_file = Path("temp_adapters.fa")
+                with open(temp_adapter_file, 'w') as f:
+                    f.write(f">adapter\n{adapter_seq}\n")
+                steps.append(f"ILLUMINACLIP:{temp_adapter_file}:2:30:10")
 
         # 2. 滑动窗口质量修剪
         window_size = config.get('window_size', 4)  # small RNA窗口较小
         required_quality = config.get('required_quality', 20)
-        steps.extend(["SLIDINGWINDOW", f"{window_size}:{required_quality}"])
+        steps.append(f"SLIDINGWINDOW:{window_size}:{required_quality}")
 
         # 3. 前导质量修剪
         leading_quality = config.get('leading_quality', 20)
-        steps.extend(["LEADING", str(leading_quality)])
+        steps.append(f"LEADING:{leading_quality}")
 
         # 4. 末尾质量修剪
         trailing_quality = config.get('trailing_quality', 20)
-        steps.extend(["TRAILING", str(trailing_quality)])
+        steps.append(f"TRAILING:{trailing_quality}")
 
         # 5. 最小长度筛选 (small RNA通常18-35nt)
         min_length = config.get('min_length', 18)
-        steps.extend(["MINLEN", str(min_length)])
+        steps.append(f"MINLEN:{min_length}")
 
         # 6. 裁剪到固定长度 (可选，用于标准化)
         if config.get('crop_length'):
-            steps.extend(["CROP", str(config['crop_length'])])
+            steps.append(f"CROP:{config['crop_length']}")
 
         return steps
 
@@ -434,6 +451,7 @@ def load_config(config_file: Optional[str] = None) -> Dict[str, Any]:
     default_config = {
         'threads': 4,
         'adapter': 'vahts_small_rna_v2',  # 默认使用VAHTS接头
+        'adapter_file': 'config/VAHTS-SmallRNA-V2.fa',  # 默认接头文件路径
         'window_size': 4,
         'required_quality': 20,
         'leading_quality': 20,
@@ -467,6 +485,8 @@ def load_config(config_file: Optional[str] = None) -> Dict[str, Any]:
                         default_config['min_length'] = trimmomatic_config['minlen']
                     if 'adapter_type' in trimmomatic_config:
                         default_config['adapter'] = trimmomatic_config['adapter_type']
+                    if 'adapter_file' in trimmomatic_config:
+                        default_config['adapter_file'] = trimmomatic_config['adapter_file']
                 logger.info(f"已加载配置文件: {config_file}")
         except Exception as e:
             logger.warning(f"加载配置文件失败: {e}，使用默认配置")
