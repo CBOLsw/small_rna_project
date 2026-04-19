@@ -17,10 +17,15 @@ import sys
 import argparse
 import subprocess
 import shutil
+import time
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 import logging
 import json
+
+# 导入压缩文件处理工具
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.compression_utils import ensure_uncompressed
 
 # 配置日志
 logging.basicConfig(
@@ -113,6 +118,33 @@ class Bowtie2IndexBuilder:
             logger.error(f"参考基因组文件不存在: {genome_path}")
             return {'success': False, 'error': '输入文件不存在'}
 
+        # 确保基因组文件是解压状态
+        logger.info(f"检查参考基因组文件是否是压缩格式: {genome_file}")
+        uncompressed_genome, decompress_success = ensure_uncompressed(genome_file)
+        if not decompress_success:
+            logger.error(f"无法处理压缩文件: {genome_file}")
+            return {'success': False, 'error': '无法处理压缩文件'}
+        logger.info(f"使用文件: {uncompressed_genome}")
+
+        # 检查并创建FASTA索引文件（.fai）
+        genome_fai = f"{uncompressed_genome}.fai"
+        if not Path(genome_fai).exists():
+            logger.info("正在创建基因组索引文件（.fai）...")
+            try:
+                # 使用samtools faidx创建索引
+                result = subprocess.run(
+                    ['samtools', 'faidx', uncompressed_genome],
+                    capture_output=True,
+                    text=True,
+                    check=False
+                )
+                if result.returncode == 0:
+                    logger.info(f"基因组索引文件创建成功: {genome_fai}")
+                else:
+                    logger.warning(f"无法创建基因组索引文件: {result.stderr}")
+            except FileNotFoundError:
+                logger.warning("未找到samtools工具，无法创建基因组索引文件")
+
         # 检查输出目录
         output_dir = output_path.parent
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -129,21 +161,22 @@ class Bowtie2IndexBuilder:
 
         # 准备构建命令
         cmd = self._build_index_command(
-            genome_file, output_prefix, threads, small_rna_mode
+            uncompressed_genome, output_prefix, threads, small_rna_mode
         )
 
-        logger.info(f"开始构建Bowtie2索引: {genome_path.name}")
+        logger.info(f"开始构建Bowtie2索引: {Path(uncompressed_genome).name}")
         logger.info(f"输出前缀: {output_prefix}")
         logger.info(f"线程数: {threads}")
         logger.info(f"small RNA模式: {small_rna_mode}")
 
         # 执行构建命令
-        success, stats = self._run_bowtie2_build(cmd, genome_path, output_prefix)
+        success, stats = self._run_bowtie2_build(cmd, Path(uncompressed_genome), output_prefix)
 
         result = {
             'success': success,
             'skipped': False,
             'genome_file': str(genome_path),
+            'uncompressed_genome': uncompressed_genome,
             'index_prefix': str(output_prefix),
             'threads': threads,
             'small_rna_mode': small_rna_mode,
@@ -156,25 +189,13 @@ class Bowtie2IndexBuilder:
     def _build_index_command(self, genome_file: str, output_prefix: str,
                              threads: int, small_rna_mode: bool) -> List[str]:
         """构建Bowtie2索引命令"""
+        # 直接使用默认参数，避免内存不足问题
         cmd = [
             self.bowtie2_build_path,
             "--threads", str(threads),
-        ]
-
-        # small RNA优化参数
-        if small_rna_mode:
-            # 对于small RNA，使用较小的seed length和更宽松的参数
-            cmd.extend([
-                "--seed", "16",  # 较小的seed length适应短序列
-                "--bmax", "100",  # 减少内存使用
-                "--dcv", "1024",  # 减少内存使用
-                "--nodc",  # 禁用深度压缩
-            ])
-
-        cmd.extend([
             genome_file,
             str(output_prefix)
-        ])
+        ]
 
         return cmd
 

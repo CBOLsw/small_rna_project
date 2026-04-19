@@ -21,9 +21,11 @@ directories:
   reports: "reports"
 
 # 参考基因组配置
+# 注意：genome_fasta可以是压缩文件(.gz)或解压文件
+#       genome_index (.fai) 会自动由samtools faidx生成，无需手动创建
 reference:
-  genome_fasta: "references/hg38.fa"
-  genome_index: "references/hg38.fa.fai"
+  genome_fasta: "references/hg38.fa.gz"
+  genome_index: "references/hg38.fa.fai"  # 自动生成，无需手动创建
   bowtie2_index: "references/bowtie2_index/hg38"
   gtf_annotation: "references/hg38.gtf"
 

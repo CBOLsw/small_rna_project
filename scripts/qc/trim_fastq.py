@@ -122,15 +122,17 @@ class TrimmomaticProcessor:
         output_path = Path(output_file)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        log_file = output_path.parent / f"{sample_name}_trimmomatic.log"
+        # 不创建额外的日志文件，让Snakefile处理日志
+        # 直接传递一个简单的trimmomatic日志路径给-trimlog参数
+        trimlog_file = output_path.parent / f"{sample_name}_trimlog.txt"
 
         # 构建Trimmomatic命令
         cmd = self._build_single_end_command(
-            input_file, output_path, log_file, config
+            input_file, output_path, trimlog_file, config
         )
 
         # 执行命令
-        success, stats = self._run_trimmomatic(cmd, log_file, sample_name)
+        success, stats = self._run_trimmomatic(cmd, trimlog_file, sample_name)
 
         result = {
             'sample': sample_name,
@@ -330,21 +332,28 @@ class TrimmomaticProcessor:
         logger.info(f"运行命令: {' '.join(cmd)}")
 
         try:
-            with open(log_file, 'w') as log_f:
-                result = subprocess.run(
-                    cmd,
-                    stdout=log_f,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    check=False
-                )
+            # 不重定向输出，让输出直接到终端
+            # 这样用户可以看到Trimmomatic的实时进度
+            logger.info(f"开始处理样本: {sample_name}")
+            logger.info(f"输出将直接显示在终端，Trimmomatic可能需要几分钟才能完成...")
+
+            result = subprocess.run(
+                cmd,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+                check=False
+            )
 
             if result.returncode == 0:
                 logger.info(f"Trimmomatic处理成功: {sample_name}")
-                stats = self._parse_trimmomatic_log(log_file, sample_name)
+                # 尝试解析trimmomatic的输出，但如果失败，返回空统计
+                try:
+                    stats = self._parse_trimmomatic_log(log_file, sample_name)
+                except:
+                    stats = {'input_reads': 0, 'surviving_reads': 0, 'dropped_reads': 0, 'survival_rate': 0.0}
                 return True, stats
             else:
-                logger.error(f"Trimmomatic处理失败: {sample_name}")
+                logger.error(f"Trimmomatic处理失败: {sample_name}, 返回码: {result.returncode}")
                 return False, {}
 
         except Exception as e:
@@ -551,7 +560,10 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # 提取样本名：从输出文件名提取，而不是输入文件名
+    # 处理压缩文件 .gz 的情况
     sample_name = output_path.stem
+    if sample_name.endswith('.fastq') or sample_name.endswith('.fq'):
+        sample_name = Path(sample_name).stem
     if sample_name.endswith('_trimmed'):
         sample_name = sample_name[:-8]
 

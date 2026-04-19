@@ -25,6 +25,10 @@ import yaml
 import subprocess
 import tempfile
 
+# 导入压缩文件处理工具
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.compression_utils import ensure_uncompressed
+
 # 尝试导入BioPython（可选）
 try:
     from Bio import SeqIO
@@ -190,15 +194,23 @@ class SequenceExtractor:
         sequences = {}
 
         try:
+            # 确保基因组文件是解压状态
+            logger.info(f"检查参考基因组文件是否是压缩格式: {genome_file}")
+            uncompressed_genome, decompress_success = ensure_uncompressed(genome_file)
+            if not decompress_success:
+                logger.error(f"无法处理压缩文件: {genome_file}")
+                return {}
+            logger.info(f"使用文件: {uncompressed_genome}")
+
             # 方法1: 使用samtools faidx
             if self._check_samtools():
-                sequences = self._extract_with_samtools(gene_coords, genome_file, config)
+                sequences = self._extract_with_samtools(gene_coords, uncompressed_genome, config)
                 logger.info(f"使用samtools提取 {len(sequences)} 个序列")
                 return sequences
 
             # 方法2: 使用BioPython（如果可用）
             elif HAS_BIOPYTHON:
-                sequences = self._extract_with_biopython(gene_coords, genome_file, config)
+                sequences = self._extract_with_biopython(gene_coords, uncompressed_genome, config)
                 logger.info(f"使用BioPython提取 {len(sequences)} 个序列")
                 return sequences
 
@@ -229,11 +241,19 @@ class SequenceExtractor:
         sequences = {}
 
         try:
+            # 确保基因组文件是解压状态（samtools faidx可能不支持压缩格式）
+            logger.info(f"检查参考基因组文件是否是压缩格式: {genome_file}")
+            uncompressed_genome, decompress_success = ensure_uncompressed(genome_file)
+            if not decompress_success:
+                logger.error(f"无法处理压缩文件: {genome_file}")
+                return {}
+            logger.info(f"使用文件: {uncompressed_genome}")
+
             # 检查基因组索引是否存在
-            index_file = Path(f"{genome_file}.fai")
+            index_file = Path(f"{uncompressed_genome}.fai")
             if not index_file.exists():
                 logger.info("创建基因组索引...")
-                subprocess.run(['samtools', 'faidx', genome_file], check=True)
+                subprocess.run(['samtools', 'faidx', uncompressed_genome], check=True)
 
             # 为每个基因提取序列
             for gene_id, coords in gene_coords.items():
