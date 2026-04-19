@@ -100,7 +100,7 @@ def run_snakemake(config: Dict[str, Any],
         resume: 是否从上次失败处恢复
         cores: 使用的核心数
         verbose: 是否详细输出
-        show_progress: 是否显示进度条
+        show_progress: 是否显示进度条（保留参数，现在总是直接显示Snakemake输出）
 
     返回:
         int: Snakemake退出码
@@ -111,7 +111,7 @@ def run_snakemake(config: Dict[str, Any],
     if cores is None:
         cores = config['snakemake']['cores']
 
-    # 构建Snakemake命令
+    # 构建Snakemake命令，添加--printshellcmds来显示执行的命令
     cmd = [
         'snakemake',
         '--snakefile', 'workflow/Snakefile',
@@ -119,11 +119,11 @@ def run_snakemake(config: Dict[str, Any],
         '--cores', str(cores),
         '--latency-wait', str(config['snakemake']['latency_wait']),
         '--restart-times', str(config['snakemake']['restart_times']),
+        '--printshellcmds',  # 显示正在执行的shell命令
     ]
 
     if dry_run:
         cmd.append('--dry-run')
-        cmd.append('--printshellcmds')
 
     if resume:
         cmd.append('--rerun-incomplete')
@@ -140,33 +140,15 @@ def run_snakemake(config: Dict[str, Any],
 
     logger.info(f"运行Snakemake命令: {' '.join(cmd)}")
     logger.info(f"开始执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("=" * 60)
+    logger.info("分析开始，Snakemake将显示实时进度...")
+    logger.info("=" * 60)
 
     try:
         start_time = time.time()
 
-        if show_progress and not dry_run and TQDM_AVAILABLE:
-            logger.info("显示简单的进度指示器...")
-            # 直接运行Snakemake并实时输出，不使用复杂的进度条
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-
-            # 使用tqdm显示一个无限进度条作为简单指示器
-            with tqdm(desc="分析进行中", unit="步骤", ncols=80, leave=True) as pbar:
-                # 实时读取输出
-                while True:
-                    line = process.stdout.readline()
-                    if not line and process.poll() is not None:
-                        break
-                    if line:
-                        # 输出到控制台
-                        sys.stdout.write(line)
-                        sys.stdout.flush()
-                        # 每一行输出都更新进度条（简单的动画效果）
-                        pbar.update(1)
-
-            result = type('Result', (object,), {'returncode': process.returncode})()
-        else:
-            # 如果不显示进度条或dry-run，直接执行
-            result = subprocess.run(cmd, check=False)
+        # 直接运行Snakemake，让它自己显示进度
+        result = subprocess.run(cmd, check=False)
 
         end_time = time.time()
 
@@ -174,6 +156,7 @@ def run_snakemake(config: Dict[str, Any],
         hours, remainder = divmod(elapsed_time, 3600)
         minutes, seconds = divmod(remainder, 60)
 
+        logger.info("=" * 60)
         logger.info(f"执行完成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         logger.info(f"总执行时间: {int(hours)}小时 {int(minutes)}分钟 {int(seconds)}秒")
 
