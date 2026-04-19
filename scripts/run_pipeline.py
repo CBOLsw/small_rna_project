@@ -107,6 +107,16 @@ def run_snakemake(config: Dict[str, Any],
     """
     logger = logging.getLogger(__name__)
 
+    # 首先尝试解锁（如果有锁的话）
+    unlock_cmd = [
+        'snakemake',
+        '--snakefile', 'workflow/Snakefile',
+        '--configfile', 'config/config.yaml',
+        '--unlock'
+    ]
+    logger.info("检查并清理Snakemake锁...")
+    subprocess.run(unlock_cmd, capture_output=True, check=False)
+
     # 确定核心数
     if cores is None:
         cores = config['snakemake']['cores']
