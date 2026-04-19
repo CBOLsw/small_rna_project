@@ -24,12 +24,12 @@ import logging
 import json
 import yaml
 
+# 导入项目的日志配置工具
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.logging_utils import get_script_logger
+
 # 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = get_script_logger('run_bowtie2')
 
 
 class Bowtie2Aligner:
@@ -229,8 +229,20 @@ class Bowtie2Aligner:
             "--quiet",  # 减少输出
         ]
 
-        # 添加small RNA优化参数
-        cmd.extend(self._get_small_rna_params(config))
+        # 应用预设参数
+        if config.get('preset'):
+            cmd.append(f"--{config['preset']}")
+
+        # 添加用户指定的参数（覆盖默认值）
+        if config.get('seed_length'):
+            cmd.extend(["-L", str(config['seed_length'])])
+
+        if config.get('max_mismatches'):
+            cmd.extend(["-N", str(config['max_mismatches'])])
+
+        # 添加small RNA优化参数（除非已由预设或用户指定覆盖）
+        if not config.get('preset') and config.get('small_rna_mode', True):
+            cmd.extend(self._get_small_rna_params(config))
 
         # 添加其他参数
         cmd.extend(self._get_common_params(config))
@@ -251,8 +263,20 @@ class Bowtie2Aligner:
             "--quiet",
         ]
 
-        # 添加small RNA优化参数
-        cmd.extend(self._get_small_rna_params(config))
+        # 应用预设参数
+        if config.get('preset'):
+            cmd.append(f"--{config['preset']}")
+
+        # 添加用户指定的参数（覆盖默认值）
+        if config.get('seed_length'):
+            cmd.extend(["-L", str(config['seed_length'])])
+
+        if config.get('max_mismatches'):
+            cmd.extend(["-N", str(config['max_mismatches'])])
+
+        # 添加small RNA优化参数（除非已由预设或用户指定覆盖）
+        if not config.get('preset') and config.get('small_rna_mode', True):
+            cmd.extend(self._get_small_rna_params(config))
 
         # 添加双端特定参数
         if config.get('pe_max_insert'):
@@ -335,7 +359,11 @@ class Bowtie2Aligner:
             else:
                 logger.error(f"Bowtie2比对失败: {sample_name}")
                 logger.error(f"返回码: {result.returncode}")
-                return False, ""
+                # 读取并输出Bowtie2的错误信息
+                with open(log_file, 'r') as f:
+                    log_content = f.read()
+                    logger.error(f"Bowtie2输出: {log_content}")
+                return False, log_content
 
         except Exception as e:
             logger.error(f"运行Bowtie2时出错: {e}")
@@ -684,8 +712,8 @@ def parse_arguments():
 
     parser.add_argument(
         "--output", "-o",
-        default="results/alignment/bam",
-        help="输出目录 (默认: results/alignment/bam)"
+        required=True,
+        help="输出BAM文件路径"
     )
 
     parser.add_argument(
@@ -706,6 +734,23 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--preset",
+        help="Bowtie2预设参数 (如 very-sensitive, very-sensitive-local)"
+    )
+
+    parser.add_argument(
+        "--seed-length",
+        type=int,
+        help="种子长度 (-L 参数)"
+    )
+
+    parser.add_argument(
+        "--max-mismatches",
+        type=int,
+        help="最大错配数 (-N 参数)"
+    )
+
+    parser.add_argument(
         "--summary",
         action="store_true",
         help="生成汇总报告"
@@ -722,6 +767,14 @@ def main():
     config = load_config(args.config)
     config['threads'] = args.threads
 
+    # 处理新参数
+    if args.preset:
+        config['preset'] = args.preset
+    if args.seed_length:
+        config['seed_length'] = args.seed_length
+    if args.max_mismatches:
+        config['max_mismatches'] = args.max_mismatches
+
     # 初始化比对器
     aligner = Bowtie2Aligner(bowtie2_path=config.get('bowtie2_path', 'bowtie2'))
 
@@ -732,67 +785,31 @@ def main():
 
     # 处理输入
     input_path = Path(args.input)
-    output_dir = Path(args.output)
+
+    # 输出路径处理 - Snakefile 直接传递输出BAM文件路径
+    output_bam_path = Path(args.output)
+    output_dir = output_bam_path.parent
     output_dir.mkdir(parents=True, exist_ok=True)
+    sample_name = output_bam_path.stem.replace('.sorted', '')
 
-    # 根据输入类型处理
-    if args.sample_info:
-        # 使用样本信息CSV文件
-        logger.info(f"使用样本信息文件: {args.sample_info}")
-        df = pd.read_csv(args.sample_info)
+    # 单端数据比对
+    aligner.align_single_end(
+        fastq_file=str(input_path),
+        index_prefix=args.index,
+        output_dir=str(output_dir),
+        sample_name=sample_name,
+        config=config
+    )
 
-        for _, row in df.iterrows():
-            sample = row.get('sample', f"sample_{_}")
-            fastq_r1 = row.get('fastq_r1')
-            fastq_r2 = row.get('fastq_r2')
+    # 重命名输出文件以匹配Snakefile期望的格式
+    aligned_bam = Path(output_dir) / f"{sample_name}_sorted.bam"
+    if aligned_bam.exists():
+        aligned_bam.rename(output_bam_path)
+        logger.info(f"BAM文件已重命名为: {output_bam_path}")
 
-            if pd.notna(fastq_r1) and pd.notna(fastq_r2):
-                # 双端数据
-                aligner.align_paired_end(
-                    fastq_r1=fastq_r1,
-                    fastq_r2=fastq_r2,
-                    index_prefix=args.index,
-                    output_dir=output_dir,
-                    sample_name=sample,
-                    config=config
-                )
-            elif pd.notna(fastq_r1):
-                # 单端数据
-                aligner.align_single_end(
-                    fastq_file=fastq_r1,
-                    index_prefix=args.index,
-                    output_dir=output_dir,
-                    sample_name=sample,
-                    config=config
-                )
-
-    elif input_path.is_file() and input_path.suffix in ['.fastq', '.fq', '.fastq.gz', '.fq.gz']:
-        # 单个fastq文件
-        sample_name = input_path.stem
-        if sample_name.endswith('.fastq') or sample_name.endswith('.fq'):
-            sample_name = sample_name[:-6]
-        if sample_name.endswith('_R1') or sample_name.endswith('_R2'):
-            sample_name = sample_name[:-3]
-
-        aligner.align_single_end(
-            fastq_file=str(input_path),
-            index_prefix=args.index,
-            output_dir=output_dir,
-            sample_name=sample_name,
-            config=config
-        )
-
-    else:
-        logger.error("不支持的输入类型，请提供样本信息CSV或fastq文件")
-        sys.exit(1)
-
-    # 生成汇总报告
-    if args.summary or True:  # 默认总是生成汇总
-        report_file = aligner.generate_summary(output_dir)
-        if report_file:
-            logger.info(f"比对完成，报告文件: {report_file}")
-        else:
-            logger.warning("未能生成汇总报告")
+        # 创建BAM索引
+        index_cmd = ["samtools", "index", str(output_bam_path)]
+        subprocess.run(index_cmd, capture_output=True, text=True, check=False)
 
     logger.info("Bowtie2比对流程完成")
 

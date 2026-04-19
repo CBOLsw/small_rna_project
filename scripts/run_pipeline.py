@@ -190,35 +190,75 @@ def check_pipeline_status(config: Dict[str, Any]) -> None:
     logger = logging.getLogger(__name__)
 
     results_dir = Path(config['directories']['results'])
+    log_dir = Path(config['directories']['logs'])
     if not results_dir.exists():
         logger.info("结果目录不存在，流程尚未开始")
         return
 
     # 检查各模块输出
     modules = {
-        'qc': os.path.join(results_dir, 'qc', 'qc_summary.csv'),
-        'alignment': os.path.join(results_dir, 'alignment', 'alignment_summary.csv'),
-        'counts': os.path.join(results_dir, 'counts', 'counts_summary.csv'),
-        'differential_expression': os.path.join(results_dir, 'differential_expression', 'deseq2_results.csv'),
-        'motif_analysis': os.path.join(results_dir, 'motif_analysis', 'filtered_motifs.csv'),
+        'qc': {
+            'output': os.path.join(results_dir, 'qc', 'qc_summary.csv'),
+            'log_prefix': 'fastqc_'
+        },
+        'alignment': {
+            'output': os.path.join(results_dir, 'alignment', 'alignment_summary.csv'),
+            'log_prefix': 'bowtie2_'
+        },
+        'counts': {
+            'output': os.path.join(results_dir, 'counts', 'counts_summary.csv'),
+            'log_prefix': 'count_features_'
+        },
+        'differential_expression': {
+            'output': os.path.join(results_dir, 'differential_expression', 'deseq2_results.csv'),
+            'log_prefix': 'deseq2_analysis'
+        },
+        'motif_analysis': {
+            'output': os.path.join(results_dir, 'motif_analysis', 'filtered_motifs.csv'),
+            'log_prefix': 'meme_'
+        },
     }
 
     logger.info("流程状态检查:")
     completed_modules = []
+    running_modules = []
     pending_modules = []
 
-    for module_name, output_file in modules.items():
+    for module_name, module_info in modules.items():
+        output_file = module_info['output']
+        log_prefix = module_info['log_prefix']
+
         if Path(output_file).exists():
             mtime = datetime.fromtimestamp(Path(output_file).stat().st_mtime)
             logger.info(f"  [✓] {module_name:25s} - 完成于 {mtime.strftime('%Y-%m-%d %H:%M:%S')}")
             completed_modules.append(module_name)
         else:
-            logger.info(f"  [ ] {module_name:25s} - 待执行")
-            pending_modules.append(module_name)
+            # 检查是否有正在运行的日志文件
+            is_running = False
+            if log_dir.exists():
+                for log_file in log_dir.glob(f"{log_prefix}*.log"):
+                    try:
+                        # 检查日志文件的修改时间是否在最近5分钟内
+                        mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
+                        time_diff = (datetime.now() - mtime).total_seconds()
+                        if time_diff < 300:  # 5分钟内更新过，认为正在运行
+                            is_running = True
+                            break
+                    except:
+                        pass
+
+            if is_running:
+                logger.info(f"  [⚡] {module_name:25s} - 执行中...")
+                running_modules.append(module_name)
+            else:
+                logger.info(f"  [ ] {module_name:25s} - 待执行")
+                pending_modules.append(module_name)
 
     logger.info(f"\n已完成: {len(completed_modules)}/{len(modules)} 个模块")
     if completed_modules:
         logger.info(f"已完成模块: {', '.join(completed_modules)}")
+    if running_modules:
+        logger.info(f"执行中模块: {', '.join(running_modules)}")
     if pending_modules:
         logger.info(f"待完成模块: {', '.join(pending_modules)}")
 

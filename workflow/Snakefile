@@ -102,7 +102,9 @@ rule run_trimmomatic:
     """运行Trimmomatic质量修剪"""
     input:
         fastq=lambda wildcards: get_sample_fastq_r1(wildcards.sample),
-        dir_flag=os.path.join(config["directories"]["processed"], ".dir_exists")
+        dir_flag=os.path.join(config["directories"]["processed"], ".dir_exists"),
+        # 设置QC先于Trim执行，确保质量检查完成后再修剪
+        qc_result=os.path.join(config["directories"]["results"], "qc", "{sample}_fastqc.html")
     output:
         trimmed=os.path.join(config["directories"]["processed"], "{sample}_trimmed.fastq.gz")
     log:
@@ -131,8 +133,8 @@ rule qc_summary:
     shell:
         """
         python scripts/qc/qc_summary.py \
-            --input-dir {config[directories][results]}/qc \
-            --processed-dir {config[directories][processed]} \
+            --fastqc-dir {config[directories][results]}/qc \
+            --trim-dir {config[directories][processed]} \
             --output {output} \
             2>&1 | tee {log}
         """

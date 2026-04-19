@@ -35,7 +35,7 @@ def check_config():
             print("❌ adapter_type 配置不正确")
             return False
 
-        if config.get('quality_control', {}).get('trimmomatic', {}).get('adapter_file') == 'VAHTS-SmallRNA-V2.fa':
+        if config.get('quality_control', {}).get('trimmomatic', {}).get('adapter_file') in ['VAHTS-SmallRNA-V2.fa', 'config/VAHTS-SmallRNA-V2.fa']:
             print("✅ adapter_file 配置正确")
         else:
             print("❌ adapter_file 配置不正确")

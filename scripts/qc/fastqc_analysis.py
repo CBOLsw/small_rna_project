@@ -22,12 +22,12 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import logging
 
+# 导入项目的日志配置工具
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.logging_utils import get_script_logger
+
 # 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = get_script_logger('fastqc_analysis')
 
 
 class FastQCAnalyzer:

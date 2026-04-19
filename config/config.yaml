@@ -34,12 +34,13 @@ quality_control:
   fastqc:
     threads: 4
   trimmomatic:
+    java_memory: "4g"
     threads: 4
     leading: 3
     trailing: 3
     slidingwindow: "4:15"
     minlen: 18
-    adapter_file: "VAHTS-SmallRNA-V2.fa"
+    adapter_file: "config/VAHTS-SmallRNA-V2.fa"
     adapter_type: "vahts_small_rna_v2"
 
 # 序列比对参数
@@ -88,7 +89,7 @@ motif_analysis:
 
 # Snakemake配置
 snakemake:
-  cores: 8
+  cores: 16
   latency_wait: 60
   restart_times: 2
   keep_going: true

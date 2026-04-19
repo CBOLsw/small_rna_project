@@ -24,12 +24,12 @@ import logging
 import json
 import yaml
 
+# 导入项目的日志配置工具
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.logging_utils import get_script_logger
+
 # 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = get_script_logger('trim_fastq')
 
 
 class TrimmomaticProcessor:
@@ -132,13 +132,13 @@ class TrimmomaticProcessor:
         )
 
         # 执行命令
-        success, stats = self._run_trimmomatic(cmd, trimlog_file, sample_name)
+        success, stats = self._run_trimmomatic(cmd, trimlog_file, sample_name, config)
 
         result = {
             'sample': sample_name,
             'input_file': input_file,
             'output_file': str(output_path),
-            'log_file': str(log_file),
+            'log_file': str(trimlog_file),
             'success': success,
             'type': 'single_end',
             'stats': stats
@@ -184,7 +184,7 @@ class TrimmomaticProcessor:
         )
 
         # 执行命令
-        success, stats = self._run_trimmomatic(cmd, log_file, sample_name)
+        success, stats = self._run_trimmomatic(cmd, log_file, sample_name, config)
 
         result = {
             'sample': sample_name,
@@ -218,8 +218,9 @@ class TrimmomaticProcessor:
             ]
         else:
             # 使用java -jar方式
+            java_memory = config.get('java_memory', '4g')
             cmd = [
-                self.java_path, "-jar", self.trimmomatic_path,
+                self.java_path, f"-Xmx{java_memory}", "-jar", self.trimmomatic_path,
                 "SE",
                 "-threads", str(config.get('threads', 4)),
                 "-phred33",
@@ -230,8 +231,8 @@ class TrimmomaticProcessor:
         # 添加Trimmomatic步骤
         cmd.extend(self._build_trimmomatic_steps(config))
 
-        # 添加日志重定向
-        cmd.extend(["-trimlog", str(log_file)])
+        # 不使用trimlog以提高性能（对于大文件trimlog会显著降低速度）
+        # cmd.extend(["-trimlog", str(log_file)])
 
         return cmd
 
@@ -256,8 +257,9 @@ class TrimmomaticProcessor:
             ]
         else:
             # 使用java -jar方式
+            java_memory = config.get('java_memory', '4g')
             cmd = [
-                self.java_path, "-jar", self.trimmomatic_path,
+                self.java_path, f"-Xmx{java_memory}", "-jar", self.trimmomatic_path,
                 "PE",
                 "-threads", str(config.get('threads', 4)),
                 "-phred33",
@@ -272,8 +274,8 @@ class TrimmomaticProcessor:
         # 添加Trimmomatic步骤
         cmd.extend(self._build_trimmomatic_steps(config))
 
-        # 添加日志重定向
-        cmd.extend(["-trimlog", str(log_file)])
+        # 不使用trimlog以提高性能（对于大文件trimlog会显著降低速度）
+        # cmd.extend(["-trimlog", str(log_file)])
 
         return cmd
 
@@ -327,7 +329,7 @@ class TrimmomaticProcessor:
         return steps
 
     def _run_trimmomatic(self, cmd: List[str], log_file: Path,
-                         sample_name: str) -> Tuple[bool, Dict[str, Any]]:
+                         sample_name: str, config: Dict[str, Any] = None) -> Tuple[bool, Dict[str, Any]]:
         """运行Trimmomatic命令并解析结果"""
         logger.info(f"运行命令: {' '.join(cmd)}")
 
@@ -337,20 +339,25 @@ class TrimmomaticProcessor:
             logger.info(f"开始处理样本: {sample_name}")
             logger.info(f"输出将直接显示在终端，Trimmomatic可能需要几分钟才能完成...")
 
+            # 设置Java内存环境变量（适用于conda包装的trimmomatic）
+            env = os.environ.copy()
+            if config and 'java_memory' in config:
+                java_memory = config['java_memory']
+                env['_JAVA_OPTIONS'] = f'-Xmx{java_memory}'
+                logger.info(f"设置Java内存参数: _JAVA_OPTIONS=-Xmx{java_memory}")
+
             result = subprocess.run(
                 cmd,
                 stdout=sys.stdout,
                 stderr=sys.stderr,
+                env=env,
                 check=False
             )
 
             if result.returncode == 0:
                 logger.info(f"Trimmomatic处理成功: {sample_name}")
-                # 尝试解析trimmomatic的输出，但如果失败，返回空统计
-                try:
-                    stats = self._parse_trimmomatic_log(log_file, sample_name)
-                except:
-                    stats = {'input_reads': 0, 'surviving_reads': 0, 'dropped_reads': 0, 'survival_rate': 0.0}
+                # 不使用trimlog以提高性能，返回空统计
+                stats = {'input_reads': 0, 'surviving_reads': 0, 'dropped_reads': 0, 'survival_rate': 0.0}
                 return True, stats
             else:
                 logger.error(f"Trimmomatic处理失败: {sample_name}, 返回码: {result.returncode}")
@@ -458,6 +465,7 @@ def load_config(config_file: Optional[str] = None) -> Dict[str, Any]:
     """加载配置文件"""
     default_config = {
         'threads': 4,
+        'java_memory': '4g',  # Java堆内存大小
         'adapter': 'vahts_small_rna_v2',  # 默认使用VAHTS接头
         'adapter_file': 'config/VAHTS-SmallRNA-V2.fa',  # 默认接头文件路径
         'window_size': 4,
@@ -495,6 +503,8 @@ def load_config(config_file: Optional[str] = None) -> Dict[str, Any]:
                         default_config['adapter'] = trimmomatic_config['adapter_type']
                     if 'adapter_file' in trimmomatic_config:
                         default_config['adapter_file'] = trimmomatic_config['adapter_file']
+                    if 'java_memory' in trimmomatic_config:
+                        default_config['java_memory'] = trimmomatic_config['java_memory']
                 logger.info(f"已加载配置文件: {config_file}")
         except Exception as e:
             logger.warning(f"加载配置文件失败: {e}，使用默认配置")
