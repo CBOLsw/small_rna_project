@@ -603,6 +603,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--bams",
+        nargs='*',
         help="输入BAM文件列表（可选，替代--input）"
     )
 
@@ -700,7 +701,7 @@ def main():
 
     elif args.bams:
         # 使用--bams参数
-        bam_files = args.bams.split()
+        bam_files = args.bams
         logger.info(f"使用BAM文件列表: {len(bam_files)} 个文件")
 
         for bam_file in bam_files:
