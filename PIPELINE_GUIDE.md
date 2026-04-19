@@ -34,25 +34,33 @@ small_rna_project/
 
 ### 1. 环境设置
 
-**推荐使用conda创建专门的分析环境：**
+**✅ 请选择以下**二选一**方法：**
+
+#### 方法1：手动环境配置（推荐给有经验的用户）
 ```bash
-# 创建conda环境
+# 1. 创建conda环境
 conda create -p ./envs/small_rna_analysis python=3.9
 
-# 激活环境
+# 2. 激活环境
 conda activate ./envs/small_rna_analysis
 
-# 安装所需的包（推荐使用mamba加速安装）
+# 3. 安装所需的包（推荐使用mamba加速安装）
 conda install -c bioconda snakemake fastqc trimmomatic bowtie2 samtools bedtools seqkit
 conda install -c r r-base r-deseq2
 ```
 
-**使用项目自带的安装脚本：**
+#### 方法2：使用项目自带的一键安装脚本（推荐给大多数用户）
 ```bash
 cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
 chmod +x scripts/setup/install_everything.sh
 ./scripts/setup/install_everything.sh
 ```
+
+**📝 说明：**
+- 方法2会自动执行方法1的所有步骤，包括创建conda环境、激活环境和安装所有依赖
+- 如果您选择方法2，则不需要再运行方法1的命令
+- 如果您已经手动配置了环境（方法1），则不需要再运行方法2
+- 一键安装脚本会自动处理依赖关系，避免遗漏重要的安装步骤
 
 ## 主要运行方式
 
@@ -107,6 +115,53 @@ python scripts/run_pipeline.py --config config/config.yaml --resume --cores 8
 python scripts/run_pipeline.py --config config/config.yaml --status
 ```
 
+### 完整可选配置实例
+
+**所有可用选项的综合示例：**
+```bash
+python scripts/run_pipeline.py \
+    --config config/config.yaml \
+    --cores 8 \
+    --module qc \
+    --resume \
+    --log-file logs/pipeline.log \
+    --dry-run
+```
+
+**常用组合：**
+```bash
+# 快速测试流程
+python scripts/run_pipeline.py --config config/config.yaml --dry-run
+
+# 运行完整流程并保存详细日志
+python scripts/run_pipeline.py --config config/config.yaml --cores 12 --log-file logs/full_run.log
+
+# 仅运行质量控制和序列比对
+python scripts/run_pipeline.py --config config/config.yaml --module qc
+python scripts/run_pipeline.py --config config/config.yaml --module alignment --cores 8
+
+# 恢复执行并显示详细输出
+python scripts/run_pipeline.py --config config/config.yaml --resume --cores 8 --verbose
+
+# 检查项目状态并生成状态报告
+python scripts/run_pipeline.py --config config/config.yaml --check
+python scripts/run_pipeline.py --config config/config.yaml --status
+```
+
+**run_pipeline.py 所有可选参数详细说明：**
+| 参数 | 功能 | 可选值 | 默认值 | 示例 |
+|------|------|--------|--------|------|
+| `--config, -c` | 指定配置文件路径 | 文件路径 | 必填参数 | `--config config/config.yaml` |
+| `--cores, -n` | 指定使用的CPU核心数 | 整数 | 4 | `--cores 8` |
+| `--module, -m` | 指定运行特定模块 | qc/alignment/counts/de/motif | 无（完整流程） | `--module qc` |
+| `--resume, -r` | 从上次失败处恢复运行 | 无参数（开关） | 不恢复 | `--resume` |
+| `--dry-run, -d` | 预览执行计划，不实际运行 | 无参数（开关） | 实际运行 | `--dry-run` |
+| `--check, -k` | 运行项目状态检查 | 无参数（开关） | 不检查 | `--check` |
+| `--status, -s` | 查看流程状态和完成进度 | 无参数（开关） | 不检查 | `--status` |
+| `--log-file, -l` | 指定日志文件路径 | 文件路径 | 输出到屏幕 | `--log-file logs/pipeline.log` |
+| `--verbose, -v` | 显示详细执行信息 | 无参数（开关） | 正常输出 | `--verbose` |
+| `--list-modules` | 列出所有可用的模块 | 无参数（开关） | 不列出 | `--list-modules` |
+
 ### 方式2：使用Snakemake直接运行（高级用户）
 
 ```bash
@@ -127,6 +182,15 @@ snakemake --cores 8 --configfile config/config.yaml --printshellcmds --rerun-inc
 
 ### 1. 项目信息配置
 
+| 参数 | 功能 | 可选值 | 默认值 | 示例 |
+|------|------|--------|--------|------|
+| `project_name` | 项目名称，会影响输出文件名前缀 | 字符串 | `"small_rna_analysis_gao_pal"` | `"small_rna_analysis_2026"` |
+| `samples.metadata_file` | 样本元数据文件路径（CSV格式） | 文件路径 | `"data/metadata/sample_info.csv"` | `"data/metadata/samples.csv"` |
+| `samples.group_column` | 分组信息所在列名 | 列名 | `"group"` | `"condition"` |
+| `samples.sample_column` | 样本ID所在列名 | 列名 | `"sample"` | `"SampleID"` |
+| `samples.groups` | 指定的分组（与metadata_file中的分组一致） | 字符串列表 | `["GAO", "PAL"]` | `["control", "treated"]` |
+
+**示例配置：**
 ```yaml
 # 项目名称
 project_name: "small_rna_analysis_gao_pal"
@@ -141,142 +205,94 @@ samples:
     - "PAL"
 ```
 
-**配置说明：**
-- `project_name`：项目名称，会影响输出文件名
-- `metadata_file`：样本元数据文件路径（CSV格式）
-- `group_column`：分组信息列名（在metadata_file中）
-- `sample_column`：样本名列名（在metadata_file中）
-- `groups`：指定的分组（与metadata_file中的分组一致）
-
 ### 2. 目录配置
 
-```yaml
-directories:
-  raw_fastq: "data/raw_fastq"
-  processed: "data/processed"
-  references: "references"
-  results: "results"
-  logs: "logs"
-  reports: "reports"
-```
+| 参数 | 功能 | 可选值 | 默认值 | 示例 |
+|------|------|--------|--------|------|
+| `directories.raw_fastq` | 原始FASTQ文件存放路径 | 文件夹路径 | `"data/raw_fastq"` | `"data/raw"` |
+| `directories.processed` | 处理后的中间文件路径 | 文件夹路径 | `"data/processed"` | `"tmp/processed"` |
+| `directories.references` | 参考基因组文件路径 | 文件夹路径 | `"references"` | `"data/references"` |
+| `directories.results` | 分析结果输出路径 | 文件夹路径 | `"results"` | `"outputs"` |
+| `directories.logs` | 日志文件存放路径 | 文件夹路径 | `"logs"` | `"outputs/logs"` |
+| `directories.reports` | 报告文件存放路径 | 文件夹路径 | `"reports"` | `"outputs/reports"` |
 
 ### 3. 参考基因组配置
 
-```yaml
-reference:
-  genome_fasta: "references/hg38.fa.gz"          # 基因组序列（支持压缩格式）
-  genome_index: "references/hg38.fa.fai"         # 基因组索引（自动生成）
-  bowtie2_index: "references/bowtie2_index/hg38" # Bowtie2索引前缀
-  gtf_annotation: "references/hg38.gtf"          # 基因注释文件
-```
+| 参数 | 功能 | 可选值 | 默认值 | 示例 |
+|------|------|--------|--------|------|
+| `reference.genome_fasta` | 参考基因组序列（支持.fa和.fa.gz格式） | 文件路径 | `"references/hg38.fa.gz"` | `"references/mm10.fa"` |
+| `reference.genome_index` | 基因组索引（自动生成） | 文件路径 | `"references/hg38.fa.fai"` | `"references/mm10.fa.fai"` |
+| `reference.bowtie2_index` | Bowtie2索引前缀 | 文件路径 | `"references/bowtie2_index/hg38"` | `"references/bowtie2/mm10"` |
+| `reference.gtf_annotation` | 基因注释文件（GTF格式） | 文件路径 | `"references/hg38.gtf"` | `"references/mm10.ensembl.gtf"` |
 
 **注意：** 系统会自动检测并解压压缩的基因组文件（如.gz格式）。
 
 ### 4. 质量控制参数
 
-```yaml
-quality_control:
-  fastqc:
-    threads: 4
-  trimmomatic:
-    threads: 4
-    leading: 3                # 前导质量修剪（小于3的碱基）
-    trailing: 3               # 末尾质量修剪（小于3的碱基）
-    slidingwindow: "4:15"     # 滑动窗口质量控制（窗口大小:最低质量）
-    minlen: 18                # 最小序列长度（小于18的会被丢弃）
-    adapter_file: "config/VAHTS-SmallRNA-V2.fa"
-    adapter_type: "vahts_small_rna_v2"
-```
-
-**Trimmomatic参数说明：**
-- `ILLUMINACLIP`：接头去除参数（`文件:最大误配:最小分数:保留最短序列`）
-- `SLIDINGWINDOW`：滑动窗口（`窗口大小:最低质量`）
-- `LEADING`：前导质量修剪
-- `TRAILING`：末尾质量修剪
-- `MINLEN`：最低长度过滤
+| 参数 | 功能 | 可选值 | 默认值 | 示例 |
+|------|------|--------|--------|------|
+| `quality_control.fastqc.threads` | FastQC使用的线程数 | 整数 | 4 | 8 |
+| `quality_control.trimmomatic.threads` | Trimmomatic使用的线程数 | 整数 | 4 | 8 |
+| `quality_control.trimmomatic.leading` | 前导质量修剪阈值（小于该值的碱基会被修剪） | 整数(0-40) | 3 | 5 |
+| `quality_control.trimmomatic.trailing` | 末尾质量修剪阈值（小于该值的碱基会被修剪） | 整数(0-40) | 3 | 5 |
+| `quality_control.trimmomatic.slidingwindow` | 滑动窗口参数（窗口大小:最低质量） | "w:q"格式 | `"4:15"` | `"5:20"` |
+| `quality_control.trimmomatic.minlen` | 修剪后序列的最小长度 | 整数 | 18 | 20 |
+| `quality_control.trimmomatic.adapter_file` | 接头序列文件路径 | 文件路径 | `"config/VAHTS-SmallRNA-V2.fa"` | `"config/adapters.fa"` |
+| `quality_control.trimmomatic.adapter_type` | 接头类型 | vahts_small_rna_v2/illumina | `"vahts_small_rna_v2"` | `"illumina"` |
 
 ### 5. 序列比对参数
 
-```yaml
-alignment:
-  bowtie2:
-    threads: 8
-    preset: "very-sensitive"
-    seed_length: 15
-    max_mismatches: 1
-    k: 10                     # 报告最佳k个比对结果
-  samtools:
-    threads: 4
-```
-
-**Bowtie2参数说明：**
-- `preset`：比对预设模式（very-sensitive, sensitive, fast等）
-- `seed_length`：种子匹配长度
-- `max_mismatches`：最大错配数
-- `k`：报告的最佳比对数
+| 参数 | 功能 | 可选值 | 默认值 | 示例 |
+|------|------|--------|--------|------|
+| `alignment.bowtie2.threads` | Bowtie2使用的线程数 | 整数 | 8 | 12 |
+| `alignment.bowtie2.preset` | 比对预设模式 | very-sensitive/sensitive/fast | `"very-sensitive"` | `"sensitive-local"` |
+| `alignment.bowtie2.seed_length` | 种子匹配长度 | 整数 | 15 | 20 |
+| `alignment.bowtie2.max_mismatches` | 最大错配数 | 整数 | 1 | 2 |
+| `alignment.bowtie2.k` | 报告最佳k个比对结果 | 整数 | 10 | 5 |
+| `alignment.samtools.threads` | Samtools使用的线程数 | 整数 | 4 | 8 |
 
 ### 6. 基因计数参数
 
-```yaml
-counting:
-  featureCounts:
-    threads: 8
-    strandness: 0             # 链特异性（0=无，1=有，2=反向）
-    min_overlap: 1
-    count_multi_mapping: false
-```
+| 参数 | 功能 | 可选值 | 默认值 | 示例 |
+|------|------|--------|--------|------|
+| `counting.featureCounts.threads` | FeatureCounts使用的线程数 | 整数 | 8 | 12 |
+| `counting.featureCounts.strandness` | 链特异性 | 0=无, 1=有, 2=反向 | 0 | 1 |
+| `counting.featureCounts.min_overlap` | 最小重叠长度（碱基） | 整数 | 1 | 10 |
+| `counting.featureCounts.count_multi_mapping` | 是否统计多次比对的reads | true/false | false | true |
 
 ### 7. 差异表达分析参数
 
-```yaml
-differential_expression:
-  deseq2:
-    padj_threshold: 0.05
-    log2fc_threshold: 1.0
-    shrinkage: true
-```
-
-**DESeq2参数说明：**
-- `padj_threshold`：调整后p值阈值（用于筛选差异表达基因）
-- `log2fc_threshold`：log2倍数变化阈值
-- `shrinkage`：是否使用shrinkage估计（推荐使用）
+| 参数 | 功能 | 可选值 | 默认值 | 示例 |
+|------|------|--------|--------|------|
+| `differential_expression.deseq2.padj_threshold` | 差异表达的调整后p值阈值 | (0,1) | 0.05 | 0.01 |
+| `differential_expression.deseq2.log2fc_threshold` | 差异表达的log2倍数变化阈值 | 正数 | 1.0 | 2.0 |
+| `differential_expression.deseq2.shrinkage` | 是否使用shrinkage估计 | true/false | true | false |
 
 ### 8. 基序分析参数
 
-```yaml
-motif_analysis:
-  meme:
-    min_width: 6
-    max_width: 12
-    max_motifs: 10
-    evalue_threshold: 1e-4
-    threads: 8
-  tomtom:
-    database: "JASPAR_vertebrates"
-    evalue_threshold: 0.05
-    min_overlap: 5
-  filtering:
-    evalue_threshold: 1e-4
-    min_sites: 5
-    min_width: 6
-    max_width: 12
-```
+| 参数 | 功能 | 可选值 | 默认值 | 示例 |
+|------|------|--------|--------|------|
+| `motif_analysis.meme.min_width` | 基序的最小宽度 | 整数 | 6 | 5 |
+| `motif_analysis.meme.max_width` | 基序的最大宽度 | 整数 | 12 | 15 |
+| `motif_analysis.meme.max_motifs` | 最大发现的基序数 | 整数 | 10 | 20 |
+| `motif_analysis.meme.evalue_threshold` | 基序显著性阈值 | (0,1) | 1e-4 | 1e-3 |
+| `motif_analysis.meme.threads` | MEME使用的线程数 | 整数 | 8 | 12 |
+| `motif_analysis.tomtom.database` | TomTom数据库名称 | 字符串 | `"JASPAR_vertebrates"` | `"HOCOMOCOv11_core"` |
+| `motif_analysis.tomtom.evalue_threshold` | TomTom比对显著性阈值 | (0,1) | 0.05 | 0.01 |
+| `motif_analysis.tomtom.min_overlap` | 最小重叠长度 | 整数 | 5 | 4 |
+| `motif_analysis.filtering.evalue_threshold` | 基序筛选的E值阈值 | (0,1) | 1e-4 | 1e-3 |
+| `motif_analysis.filtering.min_sites` | 基序的最小出现次数 | 整数 | 5 | 10 |
+| `motif_analysis.filtering.min_width` | 基序的最小宽度 | 整数 | 6 | 5 |
+| `motif_analysis.filtering.max_width` | 基序的最大宽度 | 整数 | 12 | 15 |
 
 ### 9. Snakemake参数
 
-```yaml
-snakemake:
-  cores: 4
-  latency_wait: 60
-  restart_times: 2
-  keep_going: true
-```
-
-**Snakemake参数说明：**
-- `cores`：默认核心数
-- `latency_wait`：等待输入文件生成的时间（秒）
-- `restart_times`：失败后重新尝试次数
-- `keep_going`：遇到错误时是否继续执行其他任务
+| 参数 | 功能 | 可选值 | 默认值 | 示例 |
+|------|------|--------|--------|------|
+| `snakemake.cores` | 默认使用的CPU核心数 | 整数 | 4 | 12 |
+| `snakemake.latency_wait` | 等待输入文件生成的时间（秒） | 整数 | 60 | 120 |
+| `snakemake.restart_times` | 失败后重新尝试次数 | 整数 | 2 | 3 |
+| `snakemake.keep_going` | 遇到错误时是否继续执行其他任务 | true/false | true | false |
 
 ## 运行示例
 
