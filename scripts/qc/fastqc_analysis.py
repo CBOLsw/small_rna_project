@@ -62,7 +62,7 @@ class FastQCAnalyzer:
             logger.error(f"未找到FastQC: {self.fastqc_path}")
             return False
 
-    def run_fastqc(self, input_path: str, output_dir: str, threads: int = 4) -> bool:
+    def run_fastqc(self, input_path: str, output_dir: str, threads: int = 4, sample_name: str = None) -> bool:
         """
         运行FastQC分析
 
@@ -70,6 +70,7 @@ class FastQCAnalyzer:
             input_path: 输入fastq文件或目录
             output_dir: 输出目录
             threads: 线程数
+            sample_name: 样本名称，用于指定输出文件名前缀（可选）
 
         返回:
             bool: 是否成功
@@ -92,6 +93,7 @@ class FastQCAnalyzer:
             logger.info(f"处理文件 {i}/{len(fastq_files)}: {fastq_file}")
 
             try:
+                # 运行FastQC
                 cmd = [
                     self.fastqc_path,
                     "-o", str(output_dir),
@@ -110,7 +112,7 @@ class FastQCAnalyzer:
                 if result.returncode == 0:
                     success_count += 1
                     # 解析结果
-                    self._parse_fastqc_result(fastq_file, output_dir)
+                    self._parse_fastqc_result(fastq_file, output_dir, sample_name)
                 else:
                     logger.error(f"FastQC处理失败: {fastq_file}")
                     logger.error(f"错误输出: {result.stderr}")
@@ -146,9 +148,10 @@ class FastQCAnalyzer:
         else:
             return file_path.suffix in ['.fastq', '.fq']
 
-    def _parse_fastqc_result(self, fastq_file: Path, output_dir: Path):
+    def _parse_fastqc_result(self, fastq_file: Path, output_dir: Path, sample_name: str = None):
         """解析FastQC结果文件"""
         # FastQC输出文件名模式
+        # 首先尝试使用原始文件名
         base_name = fastq_file.name
         if base_name.endswith('.gz'):
             base_name = base_name[:-3]
@@ -157,6 +160,28 @@ class FastQCAnalyzer:
 
         result_file = output_dir / f"{base_name}_fastqc.html"
         data_file = output_dir / f"{base_name}_fastqc.zip"
+
+        # 如果提供了sample_name，并且原始文件名的结果不存在，则尝试重命名
+        if sample_name and not result_file.exists():
+            # 使用sample_name来查找结果文件
+            sample_result_file = output_dir / f"{sample_name}_fastqc.html"
+            sample_data_file = output_dir / f"{sample_name}_fastqc.zip"
+
+            # 如果sample_name的结果文件存在，则使用它们
+            if sample_result_file.exists():
+                result_file = sample_result_file
+                data_file = sample_data_file
+            else:
+                # 否则，尝试将原始文件名的结果重命名为sample_name
+                original_result_file = output_dir / f"{base_name}_fastqc.html"
+                original_data_file = output_dir / f"{base_name}_fastqc.zip"
+
+                if original_result_file.exists():
+                    import shutil
+                    shutil.move(str(original_result_file), str(sample_result_file))
+                    shutil.move(str(original_data_file), str(sample_data_file))
+                    result_file = sample_result_file
+                    data_file = sample_data_file
 
         if result_file.exists():
             # 提取基本信息
@@ -263,6 +288,11 @@ def parse_arguments():
         help="生成汇总报告"
     )
 
+    parser.add_argument(
+        "--sample",
+        help="样本名称，用于指定输出文件名前缀（可选）"
+    )
+
     return parser.parse_args()
 
 
@@ -283,7 +313,8 @@ def main():
     success = analyzer.run_fastqc(
         input_path=args.input,
         output_dir=args.output,
-        threads=args.threads
+        threads=args.threads,
+        sample_name=args.sample
     )
 
     if not success:

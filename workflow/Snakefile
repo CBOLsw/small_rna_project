@@ -93,6 +93,7 @@ rule run_fastqc:
             --input {input.fastq} \
             --output {config[directories][results]}/qc \
             --threads {threads} \
+            --sample {wildcards.sample} \
             2>&1 | tee {log}
         """
 
