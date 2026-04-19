@@ -149,8 +149,9 @@ python scripts/run_pipeline.py --config config/config.yaml --status
 ```
 
 **run_pipeline.py 所有可选参数详细说明：**
+
 | 参数 | 功能 | 可选值 | 默认值 | 示例 |
-|------|------|--------|--------|------|
+| :--- | :--- | :--- | :--- | :--- |
 | `--config, -c` | 指定配置文件路径 | 文件路径 | 必填参数 | `--config config/config.yaml` |
 | `--cores, -n` | 指定使用的CPU核心数 | 整数 | 4 | `--cores 8` |
 | `--module, -m` | 指定运行特定模块 | qc/alignment/counts/de/motif | 无（完整流程） | `--module qc` |
