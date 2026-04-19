@@ -186,18 +186,27 @@ class QCSummary:
 
         logger.info(f"合并数据: {len(self.combined_data)} 个样本")
 
-    def generate_report(self, output_dir: str) -> Optional[str]:
+    def generate_report(self, output_path: str) -> Optional[str]:
         """
         生成综合报告
 
         参数:
-            output_dir: 输出目录
+            output_path: 输出目录或CSV文件路径
 
         返回:
             str: 报告文件路径
         """
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = Path(output_path)
+
+        # 检查是否是文件路径
+        is_file_output = output_path.suffix == '.csv'
+
+        if is_file_output:
+            output_dir = output_path.parent
+            output_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            output_dir = output_path
+            output_dir.mkdir(parents=True, exist_ok=True)
 
         if not self.combined_data:
             logger.warning("无数据可生成报告")
@@ -206,29 +215,36 @@ class QCSummary:
         # 创建DataFrame
         df = pd.DataFrame(list(self.combined_data.values()))
 
-        # 1. 保存为CSV
-        csv_file = output_dir / "qc_combined_summary.csv"
-        df.to_csv(csv_file, index=False)
-        logger.info(f"保存CSV汇总: {csv_file}")
+        if is_file_output:
+            # 直接保存为单个CSV文件
+            df.to_csv(output_path, index=False)
+            logger.info(f"保存CSV汇总: {output_path}")
+            return str(output_path)
+        else:
+            # 保存为多个文件
+            # 1. 保存为CSV
+            csv_file = output_dir / "qc_combined_summary.csv"
+            df.to_csv(csv_file, index=False)
+            logger.info(f"保存CSV汇总: {csv_file}")
 
-        # 2. 保存为JSON
-        json_file = output_dir / "qc_combined_summary.json"
-        with open(json_file, 'w') as f:
-            json.dump(self.combined_data, f, indent=2)
-        logger.info(f"保存JSON汇总: {json_file}")
+            # 2. 保存为JSON
+            json_file = output_dir / "qc_combined_summary.json"
+            with open(json_file, 'w') as f:
+                json.dump(self.combined_data, f, indent=2)
+            logger.info(f"保存JSON汇总: {json_file}")
 
-        # 3. 生成文本报告
-        report_file = output_dir / "qc_summary_report.txt"
-        self._generate_text_report(report_file, df)
-        logger.info(f"生成文本报告: {report_file}")
+            # 3. 生成文本报告
+            report_file = output_dir / "qc_summary_report.txt"
+            self._generate_text_report(report_file, df)
+            logger.info(f"生成文本报告: {report_file}")
 
-        # 4. 生成可视化
-        try:
-            self._generate_visualizations(df, output_dir)
-        except Exception as e:
-            logger.warning(f"生成可视化时出错: {e}")
+            # 4. 生成可视化
+            try:
+                self._generate_visualizations(df, output_dir)
+            except Exception as e:
+                logger.warning(f"生成可视化时出错: {e}")
 
-        return str(report_file)
+            return str(report_file)
 
     def _generate_text_report(self, report_file: Path, df: pd.DataFrame):
         """生成文本报告"""
@@ -376,7 +392,7 @@ def parse_arguments():
     parser.add_argument(
         "--output", "-o",
         default="results/qc/summary",
-        help="输出目录 (默认: results/qc/summary)"
+        help="输出目录或CSV文件路径 (默认: results/qc/summary)"
     )
 
     return parser.parse_args()
