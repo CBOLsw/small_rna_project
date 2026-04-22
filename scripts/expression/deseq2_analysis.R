@@ -227,8 +227,18 @@ read_metadata <- function(metadata_file, group_col = "group") {
   metadata$sample <- as.character(metadata$sample)
   log_message(sprintf("metadata$sample: %s", paste(metadata$sample, collapse = ", ")))
 
-  # 设置分组为因子
-  metadata[[group_col]] <- factor(metadata[[group_col]])
+  # 设置分组为因子 - 使用tryCatch捕获可能的错误
+  log_message(sprintf("group_col: %s", group_col))
+  log_message(sprintf("metadata[[group_col]] 类型: %s", class(metadata[[group_col]])))
+  log_message(sprintf("metadata[[group_col]] 值: %s", paste(unique(metadata[[group_col]]), collapse = ", ")))
+
+  tryCatch({
+    metadata[[group_col]] <- factor(metadata[[group_col]])
+    log_message(sprintf("factor() 成功, levels: %s", paste(levels(metadata[[group_col]]), collapse = ", ")))
+  }, error = function(e) {
+    log_message(sprintf("factor() 错误: %s", e$message), "ERROR")
+    stop(e)
+  })
 
   log_message(sprintf("样本数: %d", nrow(metadata)))
   log_message(sprintf("分组水平: %s", paste(levels(metadata[[group_col]]), collapse = ", ")))
