@@ -28,6 +28,12 @@ import yaml
 try:
     import matplotlib
     matplotlib.use('Agg')  # 非交互模式
+
+    # 配置matplotlib字体，避免中文字体警告
+    matplotlib.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans', 'Liberation Sans']
+    matplotlib.rcParams['font.family'] = 'sans-serif'
+    matplotlib.rcParams['axes.unicode_minus'] = False
+
     import matplotlib.pyplot as plt
     import seaborn as sns
     HAS_VIS = True
@@ -427,31 +433,31 @@ class BAMQualityAssessor:
         try:
             # 保存为文本
             with open(stats_file, 'w') as f:
-                f.write(f"=== BAM文件质量评估报告 ===\n\n")
-                f.write(f"样本: {metrics.get('sample', 'unknown')}\n")
-                f.write(f"BAM文件: {metrics.get('bam_file', 'unknown')}\n\n")
+                f.write(f"=== BAM Quality Assessment Report ===\n\n")
+                f.write(f"Sample: {metrics.get('sample', 'unknown')}\n")
+                f.write(f"BAM File: {metrics.get('bam_file', 'unknown')}\n\n")
 
-                f.write("基本统计:\n")
-                f.write(f"  总reads数: {metrics.get('total_reads', 0):,}\n")
-                f.write(f"  比对reads数: {metrics.get('mapped_reads', 0):,}\n")
-                f.write(f"  比对率: {metrics.get('mapping_rate', 0)*100:.2f}%\n")
+                f.write("Basic Statistics:\n")
+                f.write(f"  Total reads: {metrics.get('total_reads', 0):,}\n")
+                f.write(f"  Mapped reads: {metrics.get('mapped_reads', 0):,}\n")
+                f.write(f"  Mapping rate: {metrics.get('mapping_rate', 0)*100:.2f}%\n")
 
                 if 'paired_reads' in metrics:
-                    f.write(f"  双端reads数: {metrics.get('paired_reads', 0):,}\n")
-                    f.write(f"  正确配对比例: {metrics.get('proper_pair_rate', 0)*100:.2f}%\n")
+                    f.write(f"  Paired reads: {metrics.get('paired_reads', 0):,}\n")
+                    f.write(f"  Properly paired rate: {metrics.get('proper_pair_rate', 0)*100:.2f}%\n")
 
-                f.write(f"  重复reads比例: {metrics.get('duplicate_rate', 0)*100:.2f}%\n\n")
+                f.write(f"  Duplicate rate: {metrics.get('duplicate_rate', 0)*100:.2f}%\n\n")
 
-                f.write("比对质量统计:\n")
-                f.write(f"  MAPQ平均值: {metrics.get('mapq_mean', 0):.2f}\n")
-                f.write(f"  MAPQ中位数: {metrics.get('mapq_median', 0):.2f}\n")
-                f.write(f"  高质量reads比例 (MAPQ≥30): {metrics.get('high_quality_rate', 0)*100:.2f}%\n\n")
+                f.write("Mapping Quality Statistics:\n")
+                f.write(f"  MAPQ mean: {metrics.get('mapq_mean', 0):.2f}\n")
+                f.write(f"  MAPQ median: {metrics.get('mapq_median', 0):.2f}\n")
+                f.write(f"  High quality rate (MAPQ≥30): {metrics.get('high_quality_rate', 0)*100:.2f}%\n\n")
 
-                f.write("基因组覆盖度统计:\n")
-                f.write(f"  平均覆盖度: {metrics.get('mean_coverage', 0):.2f}\n")
-                f.write(f"  中位覆盖度: {metrics.get('median_coverage', 0):.2f}\n")
-                f.write(f"  ≥10x覆盖比例: {metrics.get('coverage_10x', 0)*100:.2f}%\n")
-                f.write(f"  ≥30x覆盖比例: {metrics.get('coverage_30x', 0)*100:.2f}%\n")
+                f.write("Genome Coverage Statistics:\n")
+                f.write(f"  Mean coverage: {metrics.get('mean_coverage', 0):.2f}\n")
+                f.write(f"  Median coverage: {metrics.get('median_coverage', 0):.2f}\n")
+                f.write(f"  ≥10x coverage rate: {metrics.get('coverage_10x', 0)*100:.2f}%\n")
+                f.write(f"  ≥30x coverage rate: {metrics.get('coverage_30x', 0)*100:.2f}%\n")
 
             # 保存为JSON
             with open(json_file, 'w') as f:
@@ -483,9 +489,9 @@ class BAMQualityAssessor:
                     plt.text(bar.get_x() + bar.get_width()/2., height,
                             f'{prop:.1%}', ha='center', va='bottom')
 
-            plt.xlabel('比对质量 (MAPQ)')
-            plt.ylabel('比例')
-            plt.title(f'{sample_name} - 比对质量分布')
+            plt.xlabel('Mapping Quality (MAPQ)')
+            plt.ylabel('Proportion')
+            plt.title(f'{sample_name} - Mapping Quality Distribution')
             plt.grid(True, alpha=0.3)
 
             # 保存图片
@@ -512,9 +518,9 @@ class BAMQualityAssessor:
 
             plt.hist(depths, bins=bins, alpha=0.7, color='forestgreen',
                     edgecolor='black')
-            plt.xlabel('覆盖深度')
-            plt.ylabel('位点数')
-            plt.title(f'{sample_name} - 覆盖深度分布')
+            plt.xlabel('Coverage Depth')
+            plt.ylabel('Number of Positions')
+            plt.title(f'{sample_name} - Coverage Depth Distribution')
             plt.grid(True, alpha=0.3)
 
             # 子图2: 累积覆盖度
@@ -523,9 +529,9 @@ class BAMQualityAssessor:
             cumulative = np.arange(1, len(sorted_depths) + 1) / len(sorted_depths)
 
             plt.plot(sorted_depths, cumulative, 'b-', linewidth=2)
-            plt.xlabel('覆盖深度')
-            plt.ylabel('累积比例')
-            plt.title(f'{sample_name} - 累积覆盖度')
+            plt.xlabel('Coverage Depth')
+            plt.ylabel('Cumulative Proportion')
+            plt.title(f'{sample_name} - Cumulative Coverage')
             plt.grid(True, alpha=0.3)
 
             # 添加关键点标记
@@ -569,9 +575,9 @@ class BAMQualityAssessor:
             plt.axvline(median_size, color='blue', linestyle=':', linewidth=2,
                        label=f'中位数: {median_size:.1f} bp')
 
-            plt.xlabel('插入片段大小 (bp)')
-            plt.ylabel('read对数')
-            plt.title(f'{sample_name} - 插入片段大小分布')
+            plt.xlabel('Insert Size (bp)')
+            plt.ylabel('Read Count')
+            plt.title(f'{sample_name} - Insert Size Distribution')
             plt.legend()
             plt.grid(True, alpha=0.3)
 
@@ -639,22 +645,22 @@ class BAMQualityAssessor:
         # 生成文本报告
         report_file = output_dir / "bam_quality_assessment_report.txt"
         with open(report_file, 'w') as f:
-            f.write("=== BAM文件质量评估汇总报告 ===\n\n")
-            f.write(f"评估样本数: {len(summary_data)}\n\n")
+            f.write("=== BAM Quality Assessment Summary Report ===\n\n")
+            f.write(f"Number of samples assessed: {len(summary_data)}\n\n")
 
-            f.write("样本质量指标:\n")
+            f.write("Sample quality metrics:\n")
             for _, row in df.iterrows():
                 f.write(f"  - {row['sample']}:\n")
-                f.write(f"    比对率: {row['mapping_rate']*100:.1f}%\n")
-                f.write(f"    高质量reads比例: {row['high_quality_rate']*100:.1f}%\n")
-                f.write(f"    平均覆盖度: {row['mean_coverage']:.2f}\n")
-                f.write(f"    ≥10x覆盖比例: {row['coverage_10x']*100:.1f}%\n\n")
+                f.write(f"    Mapping rate: {row['mapping_rate']*100:.1f}%\n")
+                f.write(f"    High quality rate: {row['high_quality_rate']*100:.1f}%\n")
+                f.write(f"    Mean coverage: {row['mean_coverage']:.2f}\n")
+                f.write(f"    ≥10x coverage rate: {row['coverage_10x']*100:.1f}%\n\n")
 
-            f.write("总体统计:\n")
-            f.write(f"  平均比对率: {df['mapping_rate'].mean()*100:.1f}%\n")
-            f.write(f"  平均高质量reads比例: {df['high_quality_rate'].mean()*100:.1f}%\n")
-            f.write(f"  平均覆盖度: {df['mean_coverage'].mean():.2f}\n")
-            f.write(f"  平均≥10x覆盖比例: {df['coverage_10x'].mean()*100:.1f}%\n\n")
+            f.write("Overall statistics:\n")
+            f.write(f"  Mean mapping rate: {df['mapping_rate'].mean()*100:.1f}%\n")
+            f.write(f"  Mean high quality rate: {df['high_quality_rate'].mean()*100:.1f}%\n")
+            f.write(f"  Mean coverage: {df['mean_coverage'].mean():.2f}\n")
+            f.write(f"  Mean ≥10x coverage rate: {df['coverage_10x'].mean()*100:.1f}%\n\n")
 
             f.write(f"报告生成时间: {pd.Timestamp.now()}\n")
 

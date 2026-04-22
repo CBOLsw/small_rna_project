@@ -45,6 +45,57 @@ class FeatureCounter:
         self.featurecounts_path = featurecounts_path
         self.results = {}
 
+    def count_multiple_bams(self, bam_files: List[str], annotation_file: str,
+                         output_file: str, config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        对多个BAM文件进行基因计数，一次性处理并输出计数矩阵
+
+        参数:
+            bam_files: BAM文件路径列表
+            annotation_file: 基因注释文件（GTF/GFF）
+            output_file: 输出计数矩阵文件路径
+            config: 配置参数
+
+        返回:
+            Dict: 计数结果
+        """
+        if config is None:
+            config = {}
+
+        output_path = Path(output_file)
+        output_dir = output_path.parent
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"基因计数: 处理 {len(bam_files)} 个BAM文件")
+        logger.info(f"输出文件: {output_file}")
+
+        # 构建featureCounts命令
+        cmd = self._build_featurecounts_command_multi(bam_files, annotation_file, output_file, config)
+
+        # 运行featureCounts
+        log_file = output_dir / "feature_counts.log"
+        success, output = self._run_featurecounts(cmd, log_file, "multiple_samples")
+
+        result = {
+            'bam_files': bam_files,
+            'annotation_file': annotation_file,
+            'output_file': output_file,
+            'log_file': str(log_file),
+            'success': success
+        }
+
+        if success:
+            logger.info(f"基因计数完成: 成功处理 {len(bam_files)} 个样本")
+            # 解析计数结果以获取统计信息
+            try:
+                count_data = self._parse_count_file(output_path, "all_samples")
+                result.update(count_data)
+            except Exception as e:
+                logger.warning(f"解析计数文件时出错: {e}")
+
+        self.results['all_samples'] = result
+        return result
+
     def check_featurecounts(self) -> bool:
         """检查featureCounts是否可用"""
         try:
@@ -148,44 +199,29 @@ class FeatureCounter:
         self.results[sample_name] = result
         return result
 
-    def _build_featurecounts_command(self, bam_file: str, annotation_file: str,
-                                   count_file: Path, summary_file: Path,
-                                   config: Dict[str, Any]) -> List[str]:
-        """构建featureCounts命令"""
+    def _build_featurecounts_command_multi(self, bam_files: List[str], annotation_file: str,
+                                        output_file: str, config: Dict[str, Any]) -> List[str]:
+        """构建处理多个BAM文件的featureCounts命令"""
         cmd = [
             self.featurecounts_path,
             "-a", annotation_file,
-            "-o", str(count_file),
+            "-o", output_file,
             "-T", str(config.get('threads', 4)),
         ]
 
-        # 输入文件
-        cmd.append(bam_file)
-
-        # 计数参数
-        if config.get('feature_type'):
-            cmd.extend(["-t", config['feature_type']])
-        else:
-            cmd.extend(["-t", "exon"])  # 默认计数exon
-
-        if config.get('attribute'):
-            cmd.extend(["-g", config['attribute']])
-        else:
-            cmd.extend(["-g", "gene_id"])  # 默认使用gene_id
-
-        # small RNA特定参数
+        # 计数参数 - 根据small RNA模式设置合适的默认值
         if config.get('small_rna_mode', True):
-            # small RNA通常较短，需要调整参数
+            cmd.extend(["-t", config.get('feature_type', 'gene')])
+            cmd.extend(["-g", config.get('attribute', 'gene_name')])
             cmd.extend([
                 "-O",  # 允许reads分配到多个特征
                 "-M",  # 允许多重比对reads
                 "--primary",  # 只计数主要比对
                 "-s", str(config.get('strand_specific', 0)),  # 链特异性
             ])
-
-            # 对于small RNA，通常计数整个基因而不是exon
-            cmd.extend(["-t", "gene"])
-            cmd.extend(["-g", "gene_name"])
+        else:
+            cmd.extend(["-t", config.get('feature_type', 'exon')])
+            cmd.extend(["-g", config.get('attribute', 'gene_id')])
 
         # 其他参数
         if config.get('min_overlap'):
@@ -203,11 +239,8 @@ class FeatureCounter:
         if config.get('read_extension'):
             cmd.extend(["-E", str(config['read_extension'])])
 
-        # 输出选项
-        cmd.extend([
-            "-R", "BAM",  # 输出每个read的分配信息到BAM文件
-            "--verbose",
-        ])
+        # 输入文件
+        cmd.extend(bam_files)
 
         return cmd
 
@@ -289,14 +322,36 @@ class FeatureCounter:
         """解析汇总文件"""
         try:
             if not summary_file.exists():
-                # 如果没有单独的汇总文件，尝试从计数文件中提取
-                return self._parse_summary_from_count_file(summary_file.parent / f"{sample_name}_counts.txt.summary")
+                logger.warning(f"汇总文件不存在: {summary_file}")
+                # 尝试从计数文件中解析汇总信息
+                count_file = summary_file.parent / f"{sample_name}_counts.txt"
+                if count_file.exists():
+                    logger.info(f"尝试从计数文件解析汇总信息: {count_file}")
+                    return self._parse_summary_from_count_file(count_file)
+                else:
+                    logger.warning(f"计数文件也不存在: {count_file}")
+                return {
+                    'assigned': 0,
+                    'unassigned': 0,
+                    'total': 0,
+                    'assignment_rate': 0
+                }
 
             df = pd.read_csv(summary_file, sep='\t', header=0, index_col=0)
 
             # 获取统计信息
             assigned = df.loc['Assigned', 'Count'] if 'Assigned' in df.index else 0
-            unassigned = df.loc['Unassigned', 'Count'] if 'Unassigned' in df.index else 0
+            unassigned = 0
+            if 'Unassigned' in df.index:
+                unassigned = df.loc['Unassigned', 'Count']
+            else:
+                # 计算总未分配
+                unassigned_categories = ['Unassigned_NoFeatures', 'Unassigned_Ambiguity', 'Unassigned_MultiMapping', 'Unassigned_Secondary', 'Unassigned_Nonjunction', 'Unassigned_Duplicate']
+                unassigned = 0
+                for category in unassigned_categories:
+                    if category in df.index:
+                        unassigned += df.loc[category, 'Count']
+
             total = assigned + unassigned if assigned + unassigned > 0 else 1
 
             return {
@@ -700,19 +755,33 @@ def main():
                 )
 
     elif args.bams:
-        # 使用--bams参数
+        # 使用--bams参数 - 批量处理所有BAM文件
         bam_files = args.bams
         logger.info(f"使用BAM文件列表: {len(bam_files)} 个文件")
 
+        valid_bam_files = []
         for bam_file in bam_files:
             bam_path = Path(bam_file)
             if bam_path.is_file() and bam_path.suffix == '.bam':
-                sample_name = bam_path.stem.replace('.sorted', '')
-                counter.count_single_bam(
-                    bam_file=str(bam_path),
+                valid_bam_files.append(str(bam_path))
+
+        if valid_bam_files:
+            logger.info(f"有效BAM文件: {len(valid_bam_files)} 个")
+            if is_file_output:
+                # 直接保存到指定的CSV文件
+                counter.count_multiple_bams(
+                    bam_files=valid_bam_files,
                     annotation_file=args.annotation,
-                    output_dir=output_dir,
-                    sample_name=sample_name,
+                    output_file=str(output_path),
+                    config=config
+                )
+            else:
+                # 保存到默认位置
+                matrix_file = output_dir / "gene_counts.csv"
+                counter.count_multiple_bams(
+                    bam_files=valid_bam_files,
+                    annotation_file=args.annotation,
+                    output_file=str(matrix_file),
                     config=config
                 )
 
