@@ -260,14 +260,16 @@ check_consistency <- function(counts, metadata, group_col = "group") {
     stop("没有足够的共同样本进行分析")
   }
 
-  log_message(sprintf("使用 %d 个共同样本", length(common_samples)))
+  log_message(sprintf("使用 %d 个共同样本: %s", length(common_samples), paste(common_samples, collapse = ", ")))
 
   # 过滤计数矩阵和样本信息
   counts_filtered <- counts[, common_samples, drop = FALSE]
   metadata_filtered <- metadata[metadata$sample %in% common_samples, , drop = FALSE]
 
   # 确保顺序一致
-  counts_filtered <- counts_filtered[, metadata_filtered$sample]
+  counts_filtered <- counts_filtered[, metadata_filtered$sample, drop = FALSE]
+
+  log_message(sprintf("过滤后计数矩阵: %d 基因 x %d 样本", nrow(counts_filtered), ncol(counts_filtered)))
 
   return(list(counts = counts_filtered, metadata = metadata_filtered))
 }
@@ -283,6 +285,13 @@ run_deseq2 <- function(counts, metadata, group_col = "group",
 
   # 创建DESeqDataSet
   log_message("创建DESeqDataSet对象")
+
+  # 确保metadata有正确的列名
+  rownames(metadata) <- metadata$sample
+  metadata <- metadata[, group_col, drop = FALSE]
+  log_message(sprintf("colData 维度: %d 行, %d 列", nrow(metadata), ncol(metadata)))
+  log_message(sprintf("colData 行名: %s", paste(rownames(metadata), collapse = ", ")))
+  log_message(sprintf("countData 列名: %s", paste(colnames(counts)[1:min(6, ncol(counts))], collapse = ", ")))
 
   dds <- DESeqDataSetFromMatrix(
     countData = counts,
@@ -306,7 +315,15 @@ run_deseq2 <- function(counts, metadata, group_col = "group",
 
   # 运行DESeq2
   log_message("运行DESeq2分析")
-  dds <- DESeq(dds, quiet = TRUE)
+  tryCatch({
+    dds <- DESeq(dds, quiet = TRUE)
+    log_message(sprintf("DESeq2 完成, %d 个基因", nrow(dds)))
+  }, error = function(e) {
+    log_message(sprintf("DESeq2 错误: %s", e$message))
+    log_message(sprintf("dds 信息: countData=%d, colData=%d", nrow(counts(dds)), nrow(colData(dds))))
+    log_message(sprintf("group_col levels: %s", paste(levels(dds[[group_col]]), collapse = ", ")))
+    stop(e)
+  })
 
   # 获取对比组信息
   groups <- levels(dds[[group_col]])
