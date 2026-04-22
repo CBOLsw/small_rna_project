@@ -211,6 +211,8 @@ read_metadata <- function(metadata_file, group_col = "group") {
   log_message(sprintf("读取样本信息: %s", metadata_file))
 
   metadata <- read.csv(metadata_file, stringsAsFactors = FALSE)
+  log_message(sprintf("metadata 行数: %d, 列数: %d", nrow(metadata), ncol(metadata)))
+  log_message(sprintf("metadata 列名: %s", paste(colnames(metadata), collapse = ", ")))
 
   # 检查必要的列
   required_cols <- c("sample", group_col)
@@ -223,6 +225,7 @@ read_metadata <- function(metadata_file, group_col = "group") {
 
   # 确保样本名为字符
   metadata$sample <- as.character(metadata$sample)
+  log_message(sprintf("metadata$sample: %s", paste(metadata$sample, collapse = ", ")))
 
   # 设置分组为因子
   metadata[[group_col]] <- factor(metadata[[group_col]])
@@ -237,6 +240,8 @@ read_metadata <- function(metadata_file, group_col = "group") {
 # 检查计数矩阵和样本信息的一致性
 check_consistency <- function(counts, metadata, group_col = "group") {
   log_message("检查计数矩阵和样本信息的一致性")
+  log_message(sprintf("counts 列数: %d, 行数: %d", ncol(counts), nrow(counts)))
+  log_message(sprintf("metadata 行数: %d", nrow(metadata)))
 
   # 获取计数矩阵中的样本名
   count_samples <- colnames(counts)
