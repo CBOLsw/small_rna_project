@@ -181,10 +181,13 @@ read_metadata <- function(metadata_file, group_col = "group") {
   log_message(sprintf("读取样本信息: %s", metadata_file))
 
   metadata <- read.csv(metadata_file, stringsAsFactors = FALSE)
+  log_message(sprintf("read.csv 返回: nrow=%d, ncol=%d", nrow(metadata), ncol(metadata)))
 
   # 检查必要的列
   required_cols <- c("sample", group_col)
   missing_cols <- setdiff(required_cols, colnames(metadata))
+  log_message(sprintf("required_cols: %s, missing_cols: %s",
+                    paste(required_cols, collapse=","), paste(missing_cols, collapse=",")))
 
   if (length(missing_cols) > 0) {
     stop(sprintf("样本信息文件缺少必要的列: %s", paste(missing_cols, collapse = ", ")))
@@ -206,7 +209,11 @@ check_consistency <- function(counts, metadata, group_col = "group") {
   count_samples <- colnames(counts)
   metadata_samples <- metadata$sample
 
+  log_message(sprintf("count_samples: %s", paste(count_samples, collapse=",")))
+  log_message(sprintf("metadata_samples: %s", paste(metadata_samples, collapse=",")))
+
   common_samples <- intersect(count_samples, metadata_samples)
+  log_message(sprintf("common_samples: %s", paste(common_samples, collapse=",")))
 
   if (length(common_samples) < 2) {
     stop("没有足够的共同样本进行分析")
