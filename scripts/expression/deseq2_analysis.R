@@ -172,15 +172,13 @@ read_count_matrix <- function(count_file) {
   # 从列名中提取样本名（featureCounts输出的是完整路径）
   # 例如: "results/alignment/GAO_1.sorted.bam" -> "GAO_1"
   old_names <- colnames(counts)
+  log_message(sprintf("原始列名 (%d): %s", length(old_names), paste(old_names, collapse = ", ")))
+
   new_names <- gsub(".*/", "", old_names)  # 去掉路径
   new_names <- gsub("\\.sorted\\.bam$", "", new_names)  # 去掉后缀
   colnames(counts) <- new_names
 
-  if (!identical(old_names, new_names)) {
-    log_message(sprintf("样本名映射: %s -> %s",
-                        paste(head(old_names, 3), collapse = ", "),
-                        paste(head(new_names, 3), collapse = ", ")))
-  }
+  log_message(sprintf("处理后列名 (%d): %s", length(new_names), paste(new_names, collapse = ", ")))
 
   # 过滤掉非数值列（如 Chr, Start, End, Strand, Length 等元数据列）
   metadata_cols <- c("Chr", "Start", "End", "Strand", "Length", "Chr.1", "Start.1", "End.1")
