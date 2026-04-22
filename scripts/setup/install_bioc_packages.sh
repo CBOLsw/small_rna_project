@@ -49,6 +49,20 @@ print_info "当前环境: $CONDA_DEFAULT_ENV"
 
 # 安装Bioconductor包
 packages=('GenomeInfoDbData' 'DESeq2' 'GenomicRanges' 'IRanges' 'SummarizedExperiment')
+
+# 安装CRAN包（optparse等）
+print_info "检查并安装CRAN包..."
+R -e '
+    cran_packages <- c("optparse")
+    for (pkg in cran_packages) {
+        if (!requireNamespace(pkg, quietly = TRUE)) {
+            cat(sprintf("Installing %s from CRAN...\n", pkg))
+            install.packages(pkg, repos = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/", quiet = TRUE)
+        } else {
+            cat(sprintf("%s is already installed\n", pkg))
+        }
+    }
+' 2>&1
 total_packages=${#packages[@]}
 
 print_info "开始安装 $total_packages 个Bioconductor包..."

@@ -60,7 +60,7 @@ print_header "Small RNA项目 - 一键安装脚本"
 print_info "项目目录: $PROJECT_DIR"
 
 # 检查系统
-print_step "1/5" "检查系统环境"
+print_step "1/6" "检查系统环境"
 if [ "$(uname)" = "Linux" ] || [ -d "/mnt/c" ]; then
     print_success "检测到WSL2/Linux系统"
 else
@@ -70,7 +70,7 @@ else
 fi
 
 # 检查conda环境
-print_step "2/5" "检查conda环境"
+print_step "2/6" "检查conda环境"
 if command -v conda &> /dev/null; then
     # 检查conda是否为WSL2版本
     if [ "$(which conda)" = "/mnt/c/Users/24584/miniconda3/Scripts/conda.exe" ] || [[ "$(which conda)" == *".exe" ]]; then
@@ -143,7 +143,7 @@ fi
 
 # 下载参考基因组
 print_step "5/6" "下载参考基因组 (可能需要30-60分钟)"
-if [ -f "references/hg38.fa" ] && [ -f "references/hg38.gtf" ]; then
+if [ -f "references/hg38.fa" ] && [ -f "references/hg38.knownGene.gtf" ]; then
     print_success "参考基因组已存在，跳过下载"
 else
     print_info "正在下载参考基因组..."
@@ -187,7 +187,7 @@ echo "  1. 激活环境:"
 echo "     conda activate small_rna_analysis"
 echo ""
 echo "  2. 检查数据:"
-echo "     ./check_data.sh"
+echo "     python scripts/utils/final_check.py"
 echo ""
 echo "  3. 运行分析:"
 echo "     snakemake --cores 4 --configfile config/config.yaml"

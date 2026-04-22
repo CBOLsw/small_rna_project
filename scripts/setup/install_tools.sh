@@ -32,10 +32,12 @@ echo
 echo "2. 激活环境并验证工具安装"
 echo
 
-# 验证工具是否安装成功
-echo "验证工具版本:"
+# 激活环境
+eval "$(conda shell.bash hook)"
 conda activate small_rna_analysis
 
+# 验证工具是否安装成功
+echo "验证工具版本:"
 echo "Python版本: $(python --version 2>&1)"
 echo "FastQC版本: $(fastqc --version 2>&1 | head -1)"
 echo "Trimmomatic版本: $(java -jar $(which trimmomatic) -version 2>&1)"
@@ -45,6 +47,15 @@ echo "featureCounts版本: $(featureCounts -v 2>&1)"
 echo "R版本: $(R --version 2>&1 | head -1)"
 echo "MEME Suite版本: $(meme -version 2>&1 | head -1)"
 echo "Snakemake版本: $(snakemake --version 2>&1)"
+
+# 验证R包安装
+echo
+echo "验证R包安装:"
+echo "检查optparse..."
+R -e 'if (!requireNamespace("optparse", quietly = TRUE)) { cat("optparse not found, installing...\n"); install.packages("optparse", repos = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/") } else { cat("optparse OK\n") }' 2>&1
+
+echo "检查DESeq2..."
+R -e 'if (!requireNamespace("DESeq2", quietly = TRUE)) { cat("DESeq2 not found, please run install_bioc_packages.sh\n") } else { cat("DESeq2 OK\n") }' 2>&1
 
 echo
 echo "3. 安装Python包"
