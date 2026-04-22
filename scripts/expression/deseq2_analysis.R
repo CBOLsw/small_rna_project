@@ -671,10 +671,16 @@ main <- function() {
   log_message(sprintf("输出目录: %s", args$output))
 
   # 1. 读取数据
+  log_message("步骤1: 读取计数矩阵")
   counts <- read_count_matrix(args$counts)
-  metadata <- read_metadata(args$metadata, args$group_col)
+  log_message(sprintf("步骤1完成: counts 维度 %d x %d", nrow(counts), ncol(counts)))
 
-  # 2. 检查一致性
+  log_message("步骤2: 读取样本信息")
+  metadata <- read_metadata(args$metadata, args$group_col)
+  log_message(sprintf("步骤2完成: metadata 行数 %d", nrow(metadata)))
+
+  # 3. 检查一致性
+  log_message("步骤3: 检查一致性")
   checked <- check_consistency(counts, metadata, args$group_col)
   counts_filtered <- checked$counts
   metadata_filtered <- checked$metadata
