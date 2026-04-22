@@ -169,30 +169,10 @@ read_count_matrix <- function(count_file) {
     }
   })
 
-  # 从列名中提取样本名（featureCounts输出的是完整路径）
-  # 例如: "results/alignment/GAO_1.sorted.bam" -> "GAO_1"
-  old_names <- colnames(counts)
-  log_message(sprintf("原始列名 (%d): %s", length(old_names), paste(old_names, collapse = ", ")))
-
-  # 只处理BAM路径列名，不处理元数据列名
-  new_names <- old_names
-  for (i in seq_along(new_names)) {
-    name <- new_names[i]
-    # 只处理看起来像BAM路径的列名
-    if (grepl("/", name) && grepl("\\.bam$", name)) {
-      new_name <- gsub(".*/", "", name)  # 去掉路径
-      new_name <- gsub("\\.sorted\\.bam$", "", new_name)  # 去掉后缀
-      new_names[i] <- new_name
-    }
-    # 元数据列名（Chr, Start, End, Strand, Length）保持不变
-  }
-  colnames(counts) <- new_names
-
-  log_message(sprintf("处理后列名 (%d): %s", length(new_names), paste(new_names, collapse = ", ")))
-
   # 过滤掉非数值列（如 Chr, Start, End, Strand, Length 等元数据列）
   metadata_cols <- c("Chr", "Start", "End", "Strand", "Length", "Chr.1", "Start.1", "End.1")
-  counts <- counts[, !colnames(counts) %in% metadata_cols, drop = FALSE]
+  numeric_cols <- !colnames(counts) %in% metadata_cols
+  counts <- counts[, numeric_cols, drop = FALSE]
 
   # 确保所有列都是数值型
   for (col in colnames(counts)) {
@@ -211,8 +191,6 @@ read_metadata <- function(metadata_file, group_col = "group") {
   log_message(sprintf("读取样本信息: %s", metadata_file))
 
   metadata <- read.csv(metadata_file, stringsAsFactors = FALSE)
-  log_message(sprintf("metadata 行数: %d, 列数: %d", nrow(metadata), ncol(metadata)))
-  log_message(sprintf("metadata 列名: %s", paste(colnames(metadata), collapse = ", ")))
 
   # 检查必要的列
   required_cols <- c("sample", group_col)
@@ -223,25 +201,12 @@ read_metadata <- function(metadata_file, group_col = "group") {
                  paste(missing_cols, collapse = ", ")))
   }
 
-  # 确保样本名为字符
+  # 确保样本名为字符，分组为因子
   metadata$sample <- as.character(metadata$sample)
-  log_message(sprintf("metadata$sample: %s", paste(metadata$sample, collapse = ", ")))
+  metadata[[group_col]] <- factor(metadata[[group_col]])
 
-  # 设置分组为因子 - 使用tryCatch捕获可能的错误
-  log_message(sprintf("group_col: %s", group_col))
-  log_message(sprintf("metadata[[group_col]] 类型: %s", class(metadata[[group_col]])))
-  log_message(sprintf("metadata[[group_col]] 值: %s", paste(unique(metadata[[group_col]]), collapse = ", ")))
-
-  tryCatch({
-    metadata[[group_col]] <- factor(metadata[[group_col]])
-    log_message(sprintf("factor() 成功, levels: %s", paste(levels(metadata[[group_col]]), collapse = ", ")))
-  }, error = function(e) {
-    log_message(sprintf("factor() 错误: %s", e$message), "ERROR")
-    stop(e)
-  })
-
-  log_message(sprintf("样本数: %d", nrow(metadata)))
-  log_message(sprintf("分组水平: %s", paste(levels(metadata[[group_col]]), collapse = ", ")))
+  log_message(sprintf("样本数: %d, 分组: %s",
+                      nrow(metadata), paste(levels(metadata[[group_col]]), collapse = " vs ")))
 
   return(metadata)
 }
@@ -249,51 +214,21 @@ read_metadata <- function(metadata_file, group_col = "group") {
 # 检查计数矩阵和样本信息的一致性
 check_consistency <- function(counts, metadata, group_col = "group") {
   log_message("检查计数矩阵和样本信息的一致性")
-  log_message(sprintf("counts 列数: %d, 行数: %d", ncol(counts), nrow(counts)))
-  log_message(sprintf("metadata 行数: %d", nrow(metadata)))
 
-  # 获取计数矩阵中的样本名
   count_samples <- colnames(counts)
-  log_message(sprintf("计数矩阵中的样本名 (%d): %s",
-                      length(count_samples), paste(count_samples, collapse = ", ")))
-
-  # 获取样本信息中的样本名
   metadata_samples <- metadata$sample
-  log_message(sprintf("样本信息中的样本名 (%d): %s",
-                      length(metadata_samples), paste(metadata_samples, collapse = ", ")))
 
-  # 检查样本名是否匹配
-  missing_in_metadata <- setdiff(count_samples, metadata_samples)
-  missing_in_counts <- setdiff(metadata_samples, count_samples)
-
-  if (length(missing_in_metadata) > 0) {
-    warning(sprintf("以下样本在计数矩阵中存在但样本信息中缺失: %s",
-                    paste(missing_in_metadata, collapse = ", ")))
-  }
-
-  if (length(missing_in_counts) > 0) {
-    warning(sprintf("以下样本在样本信息中存在但计数矩阵中缺失: %s",
-                    paste(missing_in_counts, collapse = ", ")))
-  }
-
-  # 使用交集样本
   common_samples <- intersect(count_samples, metadata_samples)
-  log_message(sprintf("共同样本数: %d", length(common_samples)))
 
   if (length(common_samples) < 2) {
     stop("没有足够的共同样本进行分析")
   }
 
-  log_message(sprintf("使用 %d 个共同样本: %s", length(common_samples), paste(common_samples, collapse = ", ")))
+  log_message(sprintf("使用 %d 个共同样本", length(common_samples)))
 
-  # 过滤计数矩阵和样本信息
   counts_filtered <- counts[, common_samples, drop = FALSE]
   metadata_filtered <- metadata[metadata$sample %in% common_samples, , drop = FALSE]
-
-  # 确保顺序一致
   counts_filtered <- counts_filtered[, metadata_filtered$sample, drop = FALSE]
-
-  log_message(sprintf("过滤后计数矩阵: %d 基因 x %d 样本", nrow(counts_filtered), ncol(counts_filtered)))
 
   return(list(counts = counts_filtered, metadata = metadata_filtered))
 }
@@ -310,23 +245,11 @@ run_deseq2 <- function(counts, metadata, group_col = "group",
   # 创建DESeqDataSet
   log_message("创建DESeqDataSet对象")
 
-  # 确保metadata有正确的列名
-  rownames(metadata) <- metadata$sample
-  metadata <- metadata[, group_col, drop = FALSE]
-  log_message(sprintf("colData 维度: %d 行, %d 列", nrow(metadata), ncol(metadata)))
-  log_message(sprintf("colData 行名: %s", paste(rownames(metadata), collapse = ", ")))
-  log_message(sprintf("countData 列名: %s", paste(colnames(counts)[1:min(6, ncol(counts))], collapse = ", ")))
-
   dds <- DESeqDataSetFromMatrix(
     countData = counts,
     colData = metadata,
     design = as.formula(paste("~", group_col))
   )
-
-  # 调试：检查dds结构
-  log_message(sprintf("dds$sample 存在: %s", "sample" %in% colnames(colData(dds))))
-  log_message(sprintf("dds$group 存在: %s", group_col %in% colnames(colData(dds))))
-  log_message(sprintf("colData 列名: %s", paste(colnames(colData(dds)), collapse = ", ")))
 
   # 设置参考水平（对照组）
   if (!is.null(control_group)) {
@@ -344,15 +267,7 @@ run_deseq2 <- function(counts, metadata, group_col = "group",
 
   # 运行DESeq2
   log_message("运行DESeq2分析")
-  tryCatch({
-    dds <- DESeq(dds, quiet = TRUE)
-    log_message(sprintf("DESeq2 完成, %d 个基因", nrow(dds)))
-  }, error = function(e) {
-    log_message(sprintf("DESeq2 错误: %s", e$message))
-    log_message(sprintf("dds 信息: countData=%d, colData=%d", nrow(counts(dds)), nrow(colData(dds))))
-    log_message(sprintf("group_col levels: %s", paste(levels(dds[[group_col]]), collapse = ", ")))
-    stop(e)
-  })
+  dds <- DESeq(dds, quiet = TRUE)
 
   # 获取对比组信息
   groups <- levels(dds[[group_col]])
@@ -395,16 +310,8 @@ run_deseq2 <- function(counts, metadata, group_col = "group",
     select(gene_id, everything())
 
   # 添加表达水平信息
-  log_message(sprintf("添加表达水平信息: control=%s, treatment=%s", control_group, treatment_group))
-  log_message(sprintf("dds 列数: %d, dds[[group_col]] 长度: %d",
-                     ncol(counts(dds)), length(dds[[group_col]])))
-
-  # 获取对照组和处理组的列
   control_cols <- colnames(dds)[dds[[group_col]] == control_group]
   treatment_cols <- colnames(dds)[dds[[group_col]] == treatment_group]
-  log_message(sprintf("对照组列: %s", paste(control_cols, collapse = ", ")))
-  log_message(sprintf("处理组列: %s", paste(treatment_cols, collapse = ", ")))
-
   res_df$baseMean_control <- rowMeans(counts(dds)[, control_cols, drop = FALSE])
   res_df$baseMean_treatment <- rowMeans(counts(dds)[, treatment_cols, drop = FALSE])
 
@@ -680,16 +587,10 @@ main <- function() {
   log_message(sprintf("输出目录: %s", args$output))
 
   # 1. 读取数据
-  log_message("步骤1: 读取计数矩阵")
   counts <- read_count_matrix(args$counts)
-  log_message(sprintf("步骤1完成: counts 维度 %d x %d", nrow(counts), ncol(counts)))
-
-  log_message("步骤2: 读取样本信息")
   metadata <- read_metadata(args$metadata, args$group_col)
-  log_message(sprintf("步骤2完成: metadata 行数 %d", nrow(metadata)))
 
-  # 3. 检查一致性
-  log_message("步骤3: 检查一致性")
+  # 2. 检查一致性
   checked <- check_consistency(counts, metadata, args$group_col)
   counts_filtered <- checked$counts
   metadata_filtered <- checked$metadata
