@@ -366,8 +366,18 @@ run_deseq2 <- function(counts, metadata, group_col = "group",
     select(gene_id, everything())
 
   # 添加表达水平信息
-  res_df$baseMean_control <- rowMeans(counts(dds)[, dds[[group_col]] == control_group])
-  res_df$baseMean_treatment <- rowMeans(counts(dds)[, dds[[group_col]] == treatment_group])
+  log_message(sprintf("添加表达水平信息: control=%s, treatment=%s", control_group, treatment_group))
+  log_message(sprintf("dds 列数: %d, dds[[group_col]] 长度: %d",
+                     ncol(counts(dds)), length(dds[[group_col]])))
+
+  # 获取对照组和处理组的列
+  control_cols <- colnames(dds)[dds[[group_col]] == control_group]
+  treatment_cols <- colnames(dds)[dds[[group_col]] == treatment_group]
+  log_message(sprintf("对照组列: %s", paste(control_cols, collapse = ", ")))
+  log_message(sprintf("处理组列: %s", paste(treatment_cols, collapse = ", ")))
+
+  res_df$baseMean_control <- rowMeans(counts(dds)[, control_cols, drop = FALSE])
+  res_df$baseMean_treatment <- rowMeans(counts(dds)[, treatment_cols, drop = FALSE])
 
   # 计算原始倍数变化（非log2）
   res_df$fold_change <- 2^res_df$log2FoldChange
