@@ -452,12 +452,22 @@ class ExpressionMatrixGenerator:
 
         参数:
             input_dir: 输入目录或文件（featureCounts批量输出的gene_counts.csv）
-            output_dir: 输出目录
+            output_dir: 输出目录或CSV文件
             min_count: 最小计数阈值
             min_samples: 最小样本数阈值
             normalize: 是否标准化
         """
         output_path = Path(output_dir)
+
+        # 检查输出是文件还是目录
+        is_file_output = output_path.suffix == '.csv'
+        if is_file_output:
+            # 确保父目录存在
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            actual_output_dir = output_path.parent
+        else:
+            actual_output_dir = output_path
+            actual_output_dir.mkdir(parents=True, exist_ok=True)
 
         # 1. 加载计数文件
         logger.info("步骤1: 加载计数文件")
@@ -484,22 +494,28 @@ class ExpressionMatrixGenerator:
             logger.error("无法创建计数矩阵")
             return
 
-        # 3. 保存原始计数矩阵
-        logger.info("步骤3: 保存原始计数矩阵")
-        self.save_matrix(count_matrix, output_path, "raw_counts")
+        # 3. 根据输出类型保存
+        logger.info("步骤3: 保存计数矩阵")
+        if is_file_output:
+            # 直接保存矩阵到指定文件
+            count_matrix.to_csv(output_path)
+            logger.info(f"计数矩阵已保存: {output_path}")
+        else:
+            # 保存原始计数矩阵到目录
+            self.save_matrix(count_matrix, actual_output_dir, "raw_counts")
 
-        # 4. 标准化计数
-        normalized_matrix = None
-        if normalize:
-            logger.info("步骤4: 标准化计数")
-            normalized_matrix = self.normalize_counts('cpm')
-            self.save_matrix(normalized_matrix, output_path, "normalized_counts")
+            # 4. 标准化计数
+            normalized_matrix = None
+            if normalize:
+                logger.info("步骤4: 标准化计数")
+                normalized_matrix = self.normalize_counts('cpm')
+                self.save_matrix(normalized_matrix, actual_output_dir, "normalized_counts")
 
-        # 5. 生成报告
-        logger.info("步骤5: 生成分析报告")
-        self.generate_report(count_matrix, normalized_matrix, output_path)
+            # 5. 生成报告
+                logger.info("步骤5: 生成分析报告")
+                self.generate_report(count_matrix, normalized_matrix, actual_output_dir)
 
-        logger.info("表达矩阵分析完成")
+                logger.info("表达矩阵分析完成")
 
 
 def parse_arguments():
