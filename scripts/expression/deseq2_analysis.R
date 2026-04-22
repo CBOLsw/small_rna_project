@@ -1,28 +1,8 @@
 #!/usr/bin/env Rscript
-"""
-DESeq2差异表达分析脚本
+# DESeq2 differential expression analysis script
+# Usage: Rscript deseq2_analysis.R --counts <counts_file> --metadata <metadata_file> --output <output_dir>
 
-功能：
-1. 读取基因计数矩阵和样本信息
-2. 使用DESeq2进行差异表达分析
-3. 筛选差异表达基因（DEGs）
-4. 生成分析结果和统计报告
-5. 创建可视化图表（火山图、MA图、热图）
-
-使用方法：
-    Rscript deseq2_analysis.R --counts <计数矩阵文件> --metadata <样本信息文件> --output <输出目录>
-
-依赖：
-    DESeq2, ggplot2, pheatmap, dplyr, tidyverse
-
-安装依赖：
-    if (!require("BiocManager", quietly = TRUE))
-        install.packages("BiocManager")
-    BiocManager::install("DESeq2")
-    install.packages(c("ggplot2", "pheatmap", "dplyr", "tidyverse"))
-"""
-
-# 加载必要的库
+# Load required libraries
 suppressPackageStartupMessages({
   library(DESeq2)
   library(ggplot2)
