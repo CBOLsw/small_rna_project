@@ -231,8 +231,7 @@ read_metadata <- function(metadata_file, group_col = "group") {
   metadata[[group_col]] <- factor(metadata[[group_col]])
 
   log_message(sprintf("样本数: %d", nrow(metadata)))
-  log_message(sprintf("分组: %s",
-                      paste(levels(metadata[[group_col]]), collapse = " vs ")))
+  log_message(sprintf("分组水平: %s", paste(levels(metadata[[group_col]]), collapse = ", ")))
 
   return(metadata)
 }
