@@ -1,26 +1,24 @@
 #!/usr/bin/env Rscript
-"""
-DESeq2差异表达分析脚本
-
-功能：
-1. 读取基因计数矩阵和样本信息
-2. 使用DESeq2进行差异表达分析
-3. 筛选差异表达基因（DEGs）
-4. 生成分析结果和统计报告
-5. 创建可视化图表（火山图、MA图、热图）
-
-使用方法：
-    Rscript deseq2_analysis.R --counts <计数矩阵文件> --metadata <样本信息文件> --output <输出目录>
-
-依赖：
-    DESeq2, ggplot2, pheatmap, dplyr, tidyverse
-
-安装依赖：
-    if (!require("BiocManager", quietly = TRUE))
-        install.packages("BiocManager")
-    BiocManager::install("DESeq2")
-    install.packages(c("ggplot2", "pheatmap", "dplyr", "tidyverse"))
-"""
+# DESeq2差异表达分析脚本
+#
+# 功能：
+# 1. 读取基因计数矩阵和样本信息
+# 2. 使用DESeq2进行差异表达分析
+# 3. 筛选差异表达基因（DEGs）
+# 4. 生成分析结果和统计报告
+# 5. 创建可视化图表（火山图、MA图、热图）
+#
+# 使用方法：
+#    Rscript deseq2_analysis.R --counts <计数矩阵文件> --metadata <样本信息文件> --output <输出目录>
+#
+# 依赖：
+#    DESeq2, ggplot2, pheatmap, dplyr, tidyverse
+#
+# 安装依赖：
+#    if (!require("BiocManager", quietly = TRUE))
+#        install.packages("BiocManager")
+#    BiocManager::install("DESeq2")
+#    install.packages(c("ggplot2", "pheatmap", "dplyr", "tidyverse"))
 
 # 加载必要的库
 suppressPackageStartupMessages({
@@ -144,21 +142,44 @@ read_count_matrix <- function(count_file) {
   # 根据文件扩展名确定格式
   file_ext <- tools::file_ext(count_file)
 
-  if (file_ext %in% c("csv", "CSV")) {
-    counts <- read.csv(count_file, row.names = 1, check.names = FALSE)
-  } else if (file_ext %in% c("tsv", "txt", "tab")) {
-    counts <- read.delim(count_file, row.names = 1, check.names = FALSE)
-  } else if (file_ext %in% c("xlsx", "xls")) {
-    # 尝试读取Excel文件
-    if (requireNamespace("readxl", quietly = TRUE)) {
-      counts <- as.data.frame(readxl::read_excel(count_file))
-      rownames(counts) <- counts[, 1]
-      counts <- counts[, -1]
+  # featureCounts输出通常是TSV格式（即使扩展名是.csv）
+  # 先尝试用制表符读取，跳过注释行
+  counts <- tryCatch({
+    # 读取所有行
+    all_lines <- readLines(count_file)
+
+    # 找到数据行（不是#开头的注释）
+    data_lines <- all_lines[!grepl("^#", all_lines)]
+
+    # 用制表符分割
+    data <- read.delim(textConnection(paste(data_lines, collapse = "\n")),
+                       header = TRUE, check.names = FALSE)
+
+    # 第一列是基因ID
+    rownames(data) <- data[, 1]
+    data <- data[, -1, drop = FALSE]
+
+    data
+  }, error = function(e) {
+    # 如果失败，尝试其他方法
+    if (file_ext %in% c("csv", "CSV")) {
+      read.csv(count_file, row.names = 1, check.names = FALSE)
     } else {
-      stop("请安装readxl包以读取Excel文件")
+      read.delim(count_file, row.names = 1, check.names = FALSE)
     }
-  } else {
-    stop(sprintf("不支持的文件格式: %s", file_ext))
+  })
+
+  # 从列名中提取样本名（featureCounts输出的是完整路径）
+  # 例如: "results/alignment/GAO_1.sorted.bam" -> "GAO_1"
+  old_names <- colnames(counts)
+  new_names <- gsub(".*/", "", old_names)  # 去掉路径
+  new_names <- gsub("\\.sorted\\.bam$", "", new_names)  # 去掉后缀
+  colnames(counts) <- new_names
+
+  if (!identical(old_names, new_names)) {
+    log_message(sprintf("样本名映射: %s -> %s",
+                        paste(old_names, collapse = ", "),
+                        paste(new_names, collapse = ", ")))
   }
 
   log_message(sprintf("计数矩阵维度: %d 基因 x %d 样本",
