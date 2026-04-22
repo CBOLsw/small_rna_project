@@ -451,7 +451,7 @@ class ExpressionMatrixGenerator:
         运行完整分析流程
 
         参数:
-            input_dir: 输入目录（包含计数文件）
+            input_dir: 输入目录或文件（featureCounts批量输出的gene_counts.csv）
             output_dir: 输出目录
             min_count: 最小计数阈值
             min_samples: 最小样本数阈值
@@ -461,7 +461,16 @@ class ExpressionMatrixGenerator:
 
         # 1. 加载计数文件
         logger.info("步骤1: 加载计数文件")
-        count_data = self.load_count_files(input_dir)
+
+        # 检查输入是文件还是目录
+        input_path = Path(input_dir)
+        if input_path.is_file() and input_path.name == "gene_counts.csv":
+            # 直接处理文件
+            logger.info(f"检测到gene_counts.csv文件: {input_path}")
+            count_data = self._load_featurecounts_matrix(input_path)
+        else:
+            # 按目录处理
+            count_data = self.load_count_files(input_dir)
 
         if not count_data:
             logger.error("未找到有效的计数文件")
@@ -502,7 +511,7 @@ def parse_arguments():
     parser.add_argument(
         "--input", "-i",
         required=True,
-        help="输入目录，包含featureCounts计数文件"
+        help="输入目录或文件（featureCounts输出的gene_counts.csv）"
     )
 
     parser.add_argument(

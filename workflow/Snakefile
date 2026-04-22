@@ -276,9 +276,9 @@ rule deseq2_analysis:
         Rscript scripts/expression/deseq2_analysis.R \
             --counts {input.counts} \
             --metadata {input.metadata} \
-            --output-dir {config[directories][results]}/differential_expression \
+            --output {config[directories][results]}/differential_expression \
             --padj-threshold {config[differential_expression][deseq2][padj_threshold]} \
-            --log2fc-threshold {config[differential_expression][deseq2][log2fc_threshold]} \
+            --fc-threshold {config[differential_expression][deseq2][log2fc_threshold]} \
             2>&1 | tee {log}
         """
 
