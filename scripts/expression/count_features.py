@@ -211,8 +211,9 @@ class FeatureCounter:
 
         # 计数参数 - 根据small RNA模式设置合适的默认值
         if config.get('small_rna_mode', True):
-            cmd.extend(["-t", config.get('feature_type', 'gene')])
-            cmd.extend(["-g", config.get('attribute', 'gene_name')])
+            # small RNA模式使用transcript（适合knownGene等GTF格式）
+            cmd.extend(["-t", config.get('feature_type', 'transcript')])
+            cmd.extend(["-g", config.get('attribute', 'gene_id')])
             cmd.extend([
                 "-O",  # 允许reads分配到多个特征
                 "-M",  # 允许多重比对reads
@@ -623,8 +624,8 @@ def load_config(config_file: Optional[str] = None) -> Dict[str, Any]:
         'featurecounts_path': 'featureCounts',
         'threads': 4,
         'small_rna_mode': True,
-        'feature_type': 'gene',  # small RNA通常计数基因
-        'attribute': 'gene_name',
+        'feature_type': 'transcript',  # knownGene GTF使用transcript类型
+        'attribute': 'gene_id',  # knownGene GTF使用gene_id属性
         'strand_specific': 0,  # 0=无链特异性, 1=正链, 2=负链
         'min_overlap': 1,
         'frac_overlap': 0.0,

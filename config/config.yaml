@@ -21,13 +21,15 @@ directories:
   reports: "reports"
 
 # 参考基因组配置
-# 注意：genome_fasta可以是压缩文件(.gz)或解压文件
+# 注意：genome_fasta和gtf_annotation可以是压缩文件(.gz)或解压文件
 #       genome_index (.fai) 会自动由samtools faidx生成，无需手动创建
 reference:
-  genome_fasta: "references/hg38.fa.gz"
+  genome_fasta: "references/hg38.fa"
+  genome_fasta_gz: "references/hg38.fa.gz"
   genome_index: "references/hg38.fa.fai"  # 自动生成，无需手动创建
   bowtie2_index: "references/bowtie2_index/hg38"
-  gtf_annotation: "references/hg38.gtf"
+  gtf_annotation: "references/hg38.knownGene.gtf"
+  gtf_annotation_gz: "references/hg38.knownGene.gtf.gz"
 
 # 质量控制参数
 quality_control:
@@ -61,6 +63,9 @@ counting:
     strandness: 0  # 0=unstranded, 1=stranded, 2=reverse-stranded
     min_overlap: 1
     count_multi_mapping: false
+    feature_type: "transcript"  # knownGene GTF使用transcript类型
+    attribute: "gene_id"  # knownGene GTF使用gene_id属性
+    small_rna_mode: true
 
 # 差异表达分析参数
 differential_expression:
