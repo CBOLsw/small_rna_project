@@ -121,25 +121,21 @@ parse_arguments <- function() {
 read_count_matrix <- function(count_file) {
   log_message(sprintf("读取计数矩阵: %s", count_file))
 
-  # 根据文件扩展名确定格式
-  file_ext <- tools::file_ext(count_file)
+  # 读取所有行，跳过以#开头的注释行
+  all_lines <- readLines(count_file)
+  data_lines <- all_lines[!grepl("^#", all_lines)]
 
-  if (file_ext %in% c("csv", "CSV")) {
-    counts <- read.csv(count_file, row.names = 1, check.names = FALSE)
-  } else if (file_ext %in% c("tsv", "txt", "tab")) {
-    counts <- read.delim(count_file, row.names = 1, check.names = FALSE)
-  } else if (file_ext %in% c("xlsx", "xls")) {
-    # 尝试读取Excel文件
-    if (requireNamespace("readxl", quietly = TRUE)) {
-      counts <- as.data.frame(readxl::read_excel(count_file))
-      rownames(counts) <- counts[, 1]
-      counts <- counts[, -1]
-    } else {
-      stop("请安装readxl包以读取Excel文件")
-    }
-  } else {
-    stop(sprintf("不支持的文件格式: %s", file_ext))
+  if (length(data_lines) == 0) {
+    stop("计数文件没有数据行")
   }
+
+  # 用制表符分割数据
+  counts <- read.delim(text = paste(data_lines, collapse = "\n"),
+                     header = TRUE, check.names = FALSE)
+
+  # 第一列是基因ID，设为行名
+  rownames(counts) <- counts[, 1]
+  counts <- counts[, -1, drop = FALSE]
 
   # 修复列名：从完整路径提取样本名
   # 例如: "results/alignment/GAO_1.sorted.bam" -> "GAO_1"
@@ -147,6 +143,11 @@ read_count_matrix <- function(count_file) {
   new_names <- gsub(".*/", "", old_names)
   new_names <- gsub("\\.sorted\\.bam$", "", new_names)
   colnames(counts) <- new_names
+
+  # 过滤掉非数值列（Chr, Start, End, Strand, Length等元数据列）
+  metadata_cols <- c("Chr", "Start", "End", "Strand", "Length")
+  numeric_cols <- !colnames(counts) %in% metadata_cols
+  counts <- counts[, numeric_cols, drop = FALSE]
 
   log_message(sprintf("计数矩阵维度: %d 基因 x %d 样本",
                       nrow(counts), ncol(counts)))
