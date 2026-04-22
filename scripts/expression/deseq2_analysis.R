@@ -139,48 +139,38 @@ parse_arguments <- function() {
 read_count_matrix <- function(count_file) {
   log_message(sprintf("读取计数矩阵: %s", count_file))
 
-  # 根据文件扩展名确定格式
-  file_ext <- tools::file_ext(count_file)
+  # 读取所有行
+  all_lines <- readLines(count_file)
 
-  # featureCounts输出通常是TSV格式（即使扩展名是.csv）
-  # 先尝试用制表符读取，跳过注释行
-  counts <- tryCatch({
-    # 读取所有行
-    all_lines <- readLines(count_file)
+  # 找到数据行（不是#开头的注释）
+  data_lines <- all_lines[!grepl("^#", all_lines)]
 
-    # 找到数据行（不是#开头的注释）
-    data_lines <- all_lines[!grepl("^#", all_lines)]
+  # 用制表符分割
+  data <- read.delim(text = paste(data_lines, collapse = "\n"),
+                     header = TRUE, check.names = FALSE)
 
-    # 用制表符分割
-    data <- read.delim(textConnection(paste(data_lines, collapse = "\n")),
-                       header = TRUE, check.names = FALSE)
+  # 第一列是基因ID
+  rownames(data) <- data[, 1]
+  data <- data[, -1, drop = FALSE]
 
-    # 第一列是基因ID
-    rownames(data) <- data[, 1]
-    data <- data[, -1, drop = FALSE]
-
-    data
-  }, error = function(e) {
-    # 如果失败，尝试其他方法
-    if (file_ext %in% c("csv", "CSV")) {
-      read.csv(count_file, row.names = 1, check.names = FALSE)
-    } else {
-      read.delim(count_file, row.names = 1, check.names = FALSE)
-    }
-  })
+  # 修复列名：从完整路径提取样本名
+  # 例如: "results/alignment/GAO_1.sorted.bam" -> "GAO_1"
+  old_names <- colnames(data)
+  new_names <- gsub(".*/", "", old_names)  # 去掉路径
+  new_names <- gsub("\\.sorted\\.bam$", "", new_names)  # 去掉后缀
+  colnames(data) <- new_names
 
   # 过滤掉非数值列（如 Chr, Start, End, Strand, Length 等元数据列）
-  metadata_cols <- c("Chr", "Start", "End", "Strand", "Length", "Chr.1", "Start.1", "End.1")
-  numeric_cols <- !colnames(counts) %in% metadata_cols
-  counts <- counts[, numeric_cols, drop = FALSE]
+  metadata_cols <- c("Chr", "Start", "End", "Strand", "Length")
+  numeric_cols <- !colnames(data) %in% metadata_cols
+  counts <- data[, numeric_cols, drop = FALSE]
 
   # 确保所有列都是数值型
   for (col in colnames(counts)) {
     counts[[col]] <- as.numeric(counts[[col]])
   }
 
-  log_message(sprintf("计数矩阵维度: %d 基因 x %d 样本",
-                      nrow(counts), ncol(counts)))
+  log_message(sprintf("计数矩阵维度: %d 基因 x %d 样本", nrow(counts), ncol(counts)))
   log_message(sprintf("总计数: %d", sum(counts, na.rm = TRUE)))
 
   return(counts)
@@ -197,16 +187,14 @@ read_metadata <- function(metadata_file, group_col = "group") {
   missing_cols <- setdiff(required_cols, colnames(metadata))
 
   if (length(missing_cols) > 0) {
-    stop(sprintf("样本信息文件缺少必要的列: %s",
-                 paste(missing_cols, collapse = ", ")))
+    stop(sprintf("样本信息文件缺少必要的列: %s", paste(missing_cols, collapse = ", ")))
   }
 
   # 确保样本名为字符，分组为因子
   metadata$sample <- as.character(metadata$sample)
   metadata[[group_col]] <- factor(metadata[[group_col]])
 
-  log_message(sprintf("样本数: %d, 分组: %s",
-                      nrow(metadata), paste(levels(metadata[[group_col]]), collapse = " vs ")))
+  log_message(sprintf("样本数: %d, 分组: %s", nrow(metadata), paste(levels(metadata[[group_col]]), collapse = " vs ")))
 
   return(metadata)
 }
