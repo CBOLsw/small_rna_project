@@ -178,13 +178,22 @@ read_count_matrix <- function(count_file) {
 
   if (!identical(old_names, new_names)) {
     log_message(sprintf("样本名映射: %s -> %s",
-                        paste(old_names, collapse = ", "),
-                        paste(new_names, collapse = ", ")))
+                        paste(head(old_names, 3), collapse = ", "),
+                        paste(head(new_names, 3), collapse = ", ")))
+  }
+
+  # 过滤掉非数值列（如 Chr, Start, End, Strand, Length 等元数据列）
+  metadata_cols <- c("Chr", "Start", "End", "Strand", "Length", "Chr.1", "Start.1", "End.1")
+  counts <- counts[, !colnames(counts) %in% metadata_cols, drop = FALSE]
+
+  # 确保所有列都是数值型
+  for (col in colnames(counts)) {
+    counts[[col]] <- as.numeric(counts[[col]])
   }
 
   log_message(sprintf("计数矩阵维度: %d 基因 x %d 样本",
                       nrow(counts), ncol(counts)))
-  log_message(sprintf("总计数: %d", sum(counts)))
+  log_message(sprintf("总计数: %d", sum(counts, na.rm = TRUE)))
 
   return(counts)
 }
