@@ -312,7 +312,7 @@ run_deseq2 <- function(counts, metadata, group_col = "group",
   # 调试：检查dds结构
   log_message(sprintf("dds$sample 存在: %s", "sample" %in% colnames(colData(dds))))
   log_message(sprintf("dds$group 存在: %s", group_col %in% colnames(colData(dds))))
-  log_message(sprintf("colData 列名: %s", paste(colnames(colData(dds)), collapse = ", "))))
+  log_message(sprintf("colData 列名: %s", paste(colnames(colData(dds)), collapse = ", ")))
 
   # 设置参考水平（对照组）
   if (!is.null(control_group)) {
