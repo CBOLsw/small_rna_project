@@ -174,8 +174,18 @@ read_count_matrix <- function(count_file) {
   old_names <- colnames(counts)
   log_message(sprintf("原始列名 (%d): %s", length(old_names), paste(old_names, collapse = ", ")))
 
-  new_names <- gsub(".*/", "", old_names)  # 去掉路径
-  new_names <- gsub("\\.sorted\\.bam$", "", new_names)  # 去掉后缀
+  # 只处理BAM路径列名，不处理元数据列名
+  new_names <- old_names
+  for (i in seq_along(new_names)) {
+    name <- new_names[i]
+    # 只处理看起来像BAM路径的列名
+    if (grepl("/", name) && grepl("\\.bam$", name)) {
+      new_name <- gsub(".*/", "", name)  # 去掉路径
+      new_name <- gsub("\\.sorted\\.bam$", "", new_name)  # 去掉后缀
+      new_names[i] <- new_name
+    }
+    # 元数据列名（Chr, Start, End, Strand, Length）保持不变
+  }
   colnames(counts) <- new_names
 
   log_message(sprintf("处理后列名 (%d): %s", length(new_names), paste(new_names, collapse = ", ")))
