@@ -1,24 +1,26 @@
 #!/usr/bin/env Rscript
-# DESeq2差异表达分析脚本
-#
-# 功能：
-# 1. 读取基因计数矩阵和样本信息
-# 2. 使用DESeq2进行差异表达分析
-# 3. 筛选差异表达基因（DEGs）
-# 4. 生成分析结果和统计报告
-# 5. 创建可视化图表（火山图、MA图、热图）
-#
-# 使用方法：
-#    Rscript deseq2_analysis.R --counts <计数矩阵文件> --metadata <样本信息文件> --output <输出目录>
-#
-# 依赖：
-#    DESeq2, ggplot2, pheatmap, dplyr, tidyverse
-#
-# 安装依赖：
-#    if (!require("BiocManager", quietly = TRUE))
-#        install.packages("BiocManager")
-#    BiocManager::install("DESeq2")
-#    install.packages(c("ggplot2", "pheatmap", "dplyr", "tidyverse"))
+"""
+DESeq2差异表达分析脚本
+
+功能：
+1. 读取基因计数矩阵和样本信息
+2. 使用DESeq2进行差异表达分析
+3. 筛选差异表达基因（DEGs）
+4. 生成分析结果和统计报告
+5. 创建可视化图表（火山图、MA图、热图）
+
+使用方法：
+    Rscript deseq2_analysis.R --counts <计数矩阵文件> --metadata <样本信息文件> --output <输出目录>
+
+依赖：
+    DESeq2, ggplot2, pheatmap, dplyr, tidyverse
+
+安装依赖：
+    if (!require("BiocManager", quietly = TRUE))
+        install.packages("BiocManager")
+    BiocManager::install("DESeq2")
+    install.packages(c("ggplot2", "pheatmap", "dplyr", "tidyverse"))
+"""
 
 # 加载必要的库
 suppressPackageStartupMessages({
@@ -139,39 +141,36 @@ parse_arguments <- function() {
 read_count_matrix <- function(count_file) {
   log_message(sprintf("读取计数矩阵: %s", count_file))
 
-  # 读取所有行
-  all_lines <- readLines(count_file)
+  # 根据文件扩展名确定格式
+  file_ext <- tools::file_ext(count_file)
 
-  # 找到数据行（不是#开头的注释）
-  data_lines <- all_lines[!grepl("^#", all_lines)]
-
-  # 用制表符分割
-  data <- read.delim(text = paste(data_lines, collapse = "\n"),
-                     header = TRUE, check.names = FALSE)
-
-  # 第一列是基因ID
-  rownames(data) <- data[, 1]
-  data <- data[, -1, drop = FALSE]
+  if (file_ext %in% c("csv", "CSV")) {
+    counts <- read.csv(count_file, row.names = 1, check.names = FALSE)
+  } else if (file_ext %in% c("tsv", "txt", "tab")) {
+    counts <- read.delim(count_file, row.names = 1, check.names = FALSE)
+  } else if (file_ext %in% c("xlsx", "xls")) {
+    # 尝试读取Excel文件
+    if (requireNamespace("readxl", quietly = TRUE)) {
+      counts <- as.data.frame(readxl::read_excel(count_file))
+      rownames(counts) <- counts[, 1]
+      counts <- counts[, -1]
+    } else {
+      stop("请安装readxl包以读取Excel文件")
+    }
+  } else {
+    stop(sprintf("不支持的文件格式: %s", file_ext))
+  }
 
   # 修复列名：从完整路径提取样本名
   # 例如: "results/alignment/GAO_1.sorted.bam" -> "GAO_1"
-  old_names <- colnames(data)
-  new_names <- gsub(".*/", "", old_names)  # 去掉路径
-  new_names <- gsub("\\.sorted\\.bam$", "", new_names)  # 去掉后缀
-  colnames(data) <- new_names
+  old_names <- colnames(counts)
+  new_names <- gsub(".*/", "", old_names)
+  new_names <- gsub("\\.sorted\\.bam$", "", new_names)
+  colnames(counts) <- new_names
 
-  # 过滤掉非数值列（如 Chr, Start, End, Strand, Length 等元数据列）
-  metadata_cols <- c("Chr", "Start", "End", "Strand", "Length")
-  numeric_cols <- !colnames(data) %in% metadata_cols
-  counts <- data[, numeric_cols, drop = FALSE]
-
-  # 确保所有列都是数值型
-  for (col in colnames(counts)) {
-    counts[[col]] <- as.numeric(counts[[col]])
-  }
-
-  log_message(sprintf("计数矩阵维度: %d 基因 x %d 样本", nrow(counts), ncol(counts)))
-  log_message(sprintf("总计数: %d", sum(counts, na.rm = TRUE)))
+  log_message(sprintf("计数矩阵维度: %d 基因 x %d 样本",
+                      nrow(counts), ncol(counts)))
+  log_message(sprintf("总计数: %d", sum(counts)))
 
   return(counts)
 }
@@ -181,23 +180,25 @@ read_metadata <- function(metadata_file, group_col = "group") {
   log_message(sprintf("读取样本信息: %s", metadata_file))
 
   metadata <- read.csv(metadata_file, stringsAsFactors = FALSE)
-  log_message(sprintf("read.csv 返回: nrow=%d, ncol=%d", nrow(metadata), ncol(metadata)))
 
   # 检查必要的列
   required_cols <- c("sample", group_col)
   missing_cols <- setdiff(required_cols, colnames(metadata))
-  log_message(sprintf("required_cols: %s, missing_cols: %s",
-                    paste(required_cols, collapse=","), paste(missing_cols, collapse=",")))
 
   if (length(missing_cols) > 0) {
-    stop(sprintf("样本信息文件缺少必要的列: %s", paste(missing_cols, collapse = ", ")))
+    stop(sprintf("样本信息文件缺少必要的列: %s",
+                 paste(missing_cols, collapse = ", ")))
   }
 
-  # 确保样本名为字符，分组为因子
+  # 确保样本名为字符
   metadata$sample <- as.character(metadata$sample)
+
+  # 设置分组为因子
   metadata[[group_col]] <- factor(metadata[[group_col]])
 
-  log_message(sprintf("样本数: %d, 分组: %s", nrow(metadata), paste(levels(metadata[[group_col]]), collapse = " vs ")))
+  log_message(sprintf("样本数: %d", nrow(metadata)))
+  log_message(sprintf("分组: %s",
+                      paste(levels(metadata[[group_col]]), collapse = " vs ")))
 
   return(metadata)
 }
@@ -206,14 +207,28 @@ read_metadata <- function(metadata_file, group_col = "group") {
 check_consistency <- function(counts, metadata, group_col = "group") {
   log_message("检查计数矩阵和样本信息的一致性")
 
+  # 获取计数矩阵中的样本名
   count_samples <- colnames(counts)
+
+  # 获取样本信息中的样本名
   metadata_samples <- metadata$sample
 
-  log_message(sprintf("count_samples: %s", paste(count_samples, collapse=",")))
-  log_message(sprintf("metadata_samples: %s", paste(metadata_samples, collapse=",")))
+  # 检查样本名是否匹配
+  missing_in_metadata <- setdiff(count_samples, metadata_samples)
+  missing_in_counts <- setdiff(metadata_samples, count_samples)
 
+  if (length(missing_in_metadata) > 0) {
+    warning(sprintf("以下样本在计数矩阵中存在但样本信息中缺失: %s",
+                    paste(missing_in_metadata, collapse = ", ")))
+  }
+
+  if (length(missing_in_counts) > 0) {
+    warning(sprintf("以下样本在样本信息中存在但计数矩阵中缺失: %s",
+                    paste(missing_in_counts, collapse = ", ")))
+  }
+
+  # 使用交集样本
   common_samples <- intersect(count_samples, metadata_samples)
-  log_message(sprintf("common_samples: %s", paste(common_samples, collapse=",")))
 
   if (length(common_samples) < 2) {
     stop("没有足够的共同样本进行分析")
@@ -221,9 +236,12 @@ check_consistency <- function(counts, metadata, group_col = "group") {
 
   log_message(sprintf("使用 %d 个共同样本", length(common_samples)))
 
+  # 过滤计数矩阵和样本信息
   counts_filtered <- counts[, common_samples, drop = FALSE]
   metadata_filtered <- metadata[metadata$sample %in% common_samples, , drop = FALSE]
-  counts_filtered <- counts_filtered[, metadata_filtered$sample, drop = FALSE]
+
+  # 确保顺序一致
+  counts_filtered <- counts_filtered[, metadata_filtered$sample]
 
   return(list(counts = counts_filtered, metadata = metadata_filtered))
 }
@@ -305,10 +323,8 @@ run_deseq2 <- function(counts, metadata, group_col = "group",
     select(gene_id, everything())
 
   # 添加表达水平信息
-  control_cols <- colnames(dds)[dds[[group_col]] == control_group]
-  treatment_cols <- colnames(dds)[dds[[group_col]] == treatment_group]
-  res_df$baseMean_control <- rowMeans(counts(dds)[, control_cols, drop = FALSE])
-  res_df$baseMean_treatment <- rowMeans(counts(dds)[, treatment_cols, drop = FALSE])
+  res_df$baseMean_control <- rowMeans(counts(dds)[, dds[[group_col]] == control_group])
+  res_df$baseMean_treatment <- rowMeans(counts(dds)[, dds[[group_col]] == treatment_group])
 
   # 计算原始倍数变化（非log2）
   res_df$fold_change <- 2^res_df$log2FoldChange
