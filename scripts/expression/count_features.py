@@ -86,6 +86,14 @@ class FeatureCounter:
 
         if success:
             logger.info(f"基因计数完成: 成功处理 {len(bam_files)} 个样本")
+
+            # 修复列名：将完整路径改为简单的样本名
+            try:
+                self._fix_column_names(output_path)
+                logger.info("列名已修复为简单样本名")
+            except Exception as e:
+                logger.warning(f"修复列名时出错: {e}")
+
             # 解析计数结果以获取统计信息
             try:
                 count_data = self._parse_count_file(output_path, "all_samples")
@@ -115,6 +123,40 @@ class FeatureCounter:
         except FileNotFoundError:
             logger.error(f"未找到featureCounts: {self.featurecounts_path}")
             return False
+
+    def _fix_column_names(self, count_file: Path):
+        """
+        修复featureCounts输出的列名，将完整路径改为简单的样本名
+
+        参数:
+            count_file: 计数文件路径
+        """
+        import re
+
+        # 读取文件
+        with open(count_file, 'r') as f:
+            lines = f.readlines()
+
+        # 找到header行（第二行，包含列名）
+        if len(lines) < 2:
+            return
+
+        header_line = lines[1].strip()
+        new_header_parts = []
+
+        for part in header_line.split('\t'):
+            # 尝试从路径中提取样本名
+            # 例如: "results/alignment/GAO_1.sorted.bam" -> "GAO_1"
+            sample_name = re.sub(r'.*/', '', part)  # 去掉路径
+            sample_name = re.sub(r'\.sorted\.bam$', '', sample_name)  # 去掉后缀
+            new_header_parts.append(sample_name)
+
+        # 更新header行
+        lines[1] = '\t'.join(new_header_parts) + '\n'
+
+        # 写回文件
+        with open(count_file, 'w') as f:
+            f.writelines(lines)
 
     def count_single_bam(self, bam_file: str, annotation_file: str,
                         output_dir: str, sample_name: Optional[str] = None,
