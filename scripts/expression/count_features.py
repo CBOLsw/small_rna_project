@@ -776,6 +776,8 @@ def main():
                     output_file=str(output_path),
                     config=config
                 )
+                # featureCounts已直接输出矩阵，跳过generate_count_matrix
+                logger.info(f"计数矩阵已生成: {output_path}")
             else:
                 # 保存到默认位置
                 matrix_file = output_dir / "gene_counts.csv"
@@ -785,6 +787,10 @@ def main():
                     output_file=str(matrix_file),
                     config=config
                 )
+                # featureCounts已直接输出矩阵，跳过generate_count_matrix
+                logger.info(f"计数矩阵已生成: {matrix_file}")
+            # 设置标志以跳过generate_count_matrix
+            args.matrix = False
 
     elif args.input:
         # 使用--input参数
