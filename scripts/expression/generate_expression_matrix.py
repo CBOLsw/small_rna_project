@@ -55,6 +55,12 @@ class ExpressionMatrixGenerator:
             logger.error(f"输入目录不存在: {input_dir}")
             return {}
 
+        # 首先检查是否有 featureCounts 批量输出的完整计数矩阵
+        count_matrix_file = input_path / "gene_counts.csv"
+        if count_matrix_file.exists():
+            logger.info(f"找到 featureCounts 批量输出文件: {count_matrix_file}")
+            return self._load_featurecounts_matrix(count_matrix_file)
+
         count_files = list(input_path.glob(pattern))
         if not count_files:
             logger.warning(f"未找到匹配 {pattern} 的计数文件")
@@ -85,11 +91,68 @@ class ExpressionMatrixGenerator:
 
         return count_data
 
+    def _load_featurecounts_matrix(self, count_file: Path) -> Dict[str, pd.DataFrame]:
+        """
+        读取 featureCounts 批量输出的完整计数矩阵
+
+        参数:
+            count_file: 计数矩阵文件路径
+
+        返回:
+            Dict: 样本名 -> 计数DataFrame（单个基因列）
+        """
+        try:
+            # 读取 featureCounts 输出文件（跳过注释行）
+            df = pd.read_csv(count_file, sep='\t', comment='#', header=0)
+
+            logger.info(f"featureCounts 矩阵维度: {df.shape}")
+            logger.info(f"列名: {list(df.columns)}")
+
+            # 识别基因ID列
+            gene_col = None
+            for col in df.columns:
+                if 'gene' in col.lower() or col == 'Geneid':
+                    gene_col = col
+                    break
+
+            if gene_col is None:
+                logger.error("未找到基因ID列")
+                return {}
+
+            # 识别样本列（通常是 BAM 文件名或样本名）
+            sample_cols = []
+            for col in df.columns:
+                if col != gene_col and col not in ['Chr', 'Start', 'End', 'Strand', 'Length']:
+                    # 提取样本名（从完整路径或文件名）
+                    sample_name = Path(col).stem.replace('.sorted', '').replace('.bam', '')
+                    sample_cols.append((col, sample_name))
+
+            logger.info(f"识别到 {len(sample_cols)} 个样本列")
+
+            # 转换为 {样本名: DataFrame} 格式
+            count_data = {}
+            for col, sample_name in sample_cols:
+                df_sample = df[[gene_col, col]].copy()
+                df_sample.columns = ['gene_id', 'count']
+                df_sample['count'] = df_sample['count'].astype(int)
+                count_data[sample_name] = df_sample
+                logger.info(f"加载样本: {sample_name}")
+
+            return count_data
+
+        except Exception as e:
+            logger.error(f"读取 featureCounts 矩阵失败: {e}")
+            return {}
+
     def _read_count_file(self, count_file: Path) -> Optional[pd.DataFrame]:
         """读取单个计数文件"""
         try:
-            # 尝试读取featureCounts输出格式
-            df = pd.read_csv(count_file, sep='\t', comment='#', header=0)
+            # 根据文件扩展名选择分隔符
+            if count_file.suffix == '.csv' or count_file.suffix == '.CSV':
+                df = pd.read_csv(count_file, sep=',', comment='#', header=0)
+            else:
+                # 尝试读取featureCounts输出格式（TSV）
+                df = pd.read_csv(count_file, sep='\t', comment='#', header=0)
 
             # 检查必要的列
             required_cols = []
