@@ -232,9 +232,13 @@ check_consistency <- function(counts, metadata, group_col = "group") {
 
   # 获取计数矩阵中的样本名
   count_samples <- colnames(counts)
+  log_message(sprintf("计数矩阵中的样本名 (%d): %s",
+                      length(count_samples), paste(count_samples, collapse = ", ")))
 
   # 获取样本信息中的样本名
   metadata_samples <- metadata$sample
+  log_message(sprintf("样本信息中的样本名 (%d): %s",
+                      length(metadata_samples), paste(metadata_samples, collapse = ", ")))
 
   # 检查样本名是否匹配
   missing_in_metadata <- setdiff(count_samples, metadata_samples)
@@ -252,6 +256,7 @@ check_consistency <- function(counts, metadata, group_col = "group") {
 
   # 使用交集样本
   common_samples <- intersect(count_samples, metadata_samples)
+  log_message(sprintf("共同样本数: %d", length(common_samples)))
 
   if (length(common_samples) < 2) {
     stop("没有足够的共同样本进行分析")
