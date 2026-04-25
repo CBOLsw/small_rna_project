@@ -47,9 +47,27 @@ class ReferenceDownloader:
         """下载文件"""
         dest_path = Path(dest_path)
 
+        # 1. 检查解压后的文件是否已存在
         if dest_path.exists():
             logger.info(f"  [OK] {description}已存在")
             return str(dest_path)
+
+        # 2. 检查对应的压缩包是否已存在（避免重复下载）
+        gz_path = Path(str(dest_path) + '.gz')
+        if gz_path.exists():
+            logger.info(f"  [OK] {description}压缩包已存在，跳过下载")
+            logger.info(f"  正在解压...")
+            try:
+                with gzip.open(gz_path, 'rb') as f_in:
+                    with open(dest_path, 'wb') as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                if dest_path.exists():
+                    size_mb = dest_path.stat().st_size / (1024 * 1024)
+                    logger.info(f"  解压完成！文件大小: {size_mb:.1f} MB")
+                    return str(dest_path)
+            except Exception as e:
+                logger.warning(f"  解压失败: {e}，将重新下载")
+                gz_path = None  # 标记需要重新下载
 
         logger.info(f"  正在下载{description}...")
 
@@ -121,6 +139,8 @@ class ReferenceDownloader:
 
     def download_hg38_genome(self) -> Optional[str]:
         """下载hg38参考基因组 - 使用UCSC官方源"""
+        # 提示：建议手动下载（https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz）
+        # 放置到 references/hg38.fa.gz，脚本会自动检测并跳过下载
         url_candidates = [
             # 源1：UCSC官方HTTPS（稳定可用）
             "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz",
@@ -140,12 +160,14 @@ class ReferenceDownloader:
 
     def download_hg38_gtf(self) -> Optional[str]:
         """下载hg38基因注释 - 使用UCSC官方源"""
+        # 提示：建议手动下载（https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz）
+        # 放置到 references/hg38.knownGene.gtf.gz，脚本会自动检测并跳过下载
         url_candidates = [
             # 源1：UCSC官方HTTPS（稳定可用）
             "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz",
         ]
 
-        dest_path = self.ref_dir / "hg38.gtf"
+        dest_path = self.ref_dir / "hg38.knownGene.gtf"
 
         # 尝试每个URL
         for i, url in enumerate(url_candidates):
