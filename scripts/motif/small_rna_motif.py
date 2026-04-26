@@ -286,19 +286,17 @@ def extract_mirna_reads_direct(trimmed_fastq: str, sam_file: str,
 
 
 def save_reads_to_fasta(reads: List[str], output_fasta: str, max_seqs: int = 0):
-    """将reads保存为FASTA格式，带去重（同时去除反向互补重复）"""
-    seen = set()  # 存储规范化后的序列
-    unique_reads = []  # 存储原始序列（保留第一个出现的）
+    """将reads保存为FASTA格式，只做精确去重"""
+    seen = set()
+    unique_reads = []
     for seq in reads:
-        # 规范化：取正向和反向互补中字典序较小的
-        norm_seq = normalize_motif(seq)
-        if norm_seq not in seen:
-            seen.add(norm_seq)
+        if seq not in seen:
+            seen.add(seq)
             unique_reads.append(seq)
 
     original_count = len(reads)
     unique_count = len(unique_reads)
-    logger.info(f"序列去重：原始{original_count}条 → 去重后{unique_count}条（去除{original_count - unique_count}条重复/反向互补序列）")
+    logger.info(f"序列去重：原始{original_count}条 → 去重后{unique_count}条")
 
     if max_seqs > 0 and len(unique_reads) > max_seqs:
         logger.info(f"序列过多({unique_count})，随机取{max_seqs}条")
@@ -439,6 +437,110 @@ def deduplicate_motifs(motifs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     unique_motifs = list(seen.values())
     logger.info(f"Motif去重：原始{len(motifs)}个 → 去重后{len(unique_motifs)}个")
     return unique_motifs
+
+
+def parse_meme_xml(xml_file: Path) -> Tuple[List[Dict[str, Any]], str]:
+    """解析MEME XML文件，提取motifs和完整的XML内容"""
+    if not xml_file.exists():
+        return [], ""
+
+    with open(xml_file, 'r') as f:
+        content = f.read()
+
+    # 提取每个motif的信息
+    import re
+    motifs = []
+
+    # 匹配motif块：<motif id="SEQUENCE" name="MEME-N" e-value="..." width="..." ...>
+    # 然后提取后面的序列内容
+    motif_pattern = re.compile(
+        r'<motif\s+id="([^"]+)"\s+name="([^"]+)"\s+e-value="([^"]+)"[^>]*>(.*?)</motif>',
+        re.DOTALL
+    )
+
+    for match in motif_pattern.finditer(content):
+        motif_id = match.group(1)
+        motif_name = match.group(2)
+        evalue = match.group(3)
+        motif_content = match.group(4)
+
+        # 提取序列
+        seq_match = re.search(r'<sequence>(.*?)</sequence>', motif_content, re.DOTALL)
+        sequence = seq_match.group(1).strip() if seq_match else ""
+
+        motifs.append({
+            'id': motif_id,
+            'name': motif_name,
+            'evalue': float(evalue) if evalue else float('inf'),
+            'sequence': sequence,
+            'normalized_seq': normalize_motif(sequence)
+        })
+
+    return motifs, content
+
+
+def regenerate_meme_xml(xml_file: Path, output_file: Path, unique_motifs: List[Dict[str, Any]]):
+    """根据去重后的motifs重新生成精简版meme.xml"""
+    if not xml_file.exists():
+        logger.warning(f"原始meme.xml不存在，无法生成精简版")
+        return
+
+    with open(xml_file, 'r') as f:
+        content = f.read()
+
+    # 提取每个motif的完整XML块
+    import re
+    motif_blocks = {}
+    motif_pattern = re.compile(
+        r'(<motif\s+id="[^"]+"\s+name="([^"]+)"[^>]*>.*?</motif>)',
+        re.DOTALL
+    )
+
+    for match in motif_pattern.finditer(content):
+        full_block = match.group(1)
+        motif_name = match.group(2)
+        motif_blocks[motif_name] = full_block
+
+    # 收集需要保留的motif名称
+    keep_names = set()
+    for motif in unique_motifs:
+        # motif的name格式是"MEME-1"等
+        if 'name' in motif:
+            keep_names.add(motif['name'])
+
+    # 生成新的XML：保留原始的header，只保留去重后的motifs
+    lines = content.split('\n')
+    new_lines = []
+    in_motifs_section = False
+    motifs_added = set()
+
+    for line in lines:
+        if '<motifs>' in line or '<motif ' in line:
+            in_motifs_section = True
+
+        if not in_motifs_section:
+            new_lines.append(line)
+            continue
+
+        # 在motifs标签内
+        if '</motifs>' in line:
+            # 添加需要保留的motifs
+            for motif_name in sorted(keep_names, key=lambda x: int(x.split('-')[1]) if '-' in x else 0):
+                if motif_name in motif_blocks and motif_name not in motifs_added:
+                    new_lines.append(motif_blocks[motif_name])
+                    motifs_added.add(motif_name)
+            in_motifs_section = False
+            new_lines.append(line)
+        elif '<motif ' in line or '</motif>' in line:
+            # 跳过原始的motifs，稍后统一添加
+            continue
+        else:
+            new_lines.append(line)
+
+    with open(output_file, 'w') as f:
+        f.write('\n'.join(new_lines))
+
+    logger.info(f"已生成精简版meme.xml: {output_file}（保留{len(motifs_added)}个唯一motifs）")
 
 
 def check_tomtom_installed(tomtom_path: str = "tomtom") -> bool:
@@ -708,14 +810,22 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
             'tomtom_result': tomtom_data
         }
 
+    # 初始化变量
+    all_reads = []
+    sample_stats = {}
+    meme_result = {'success': False}
+    unique_motifs = []
+
     # 检查点：MEME结果已存在，跳过miRBase比对和MEME
-    meme_skipped = False
-    if meme_summary_file.exists() and combined_fasta.exists():
-        logger.info("检测到MEME结果已存在，跳过miRBase比对和MEME，直接运行TomTom")
-        meme_result = {'success': True, 'skipped': True}
-        all_reads = []
-        sample_stats = {}
-        meme_skipped = True
+    cleaned_meme_xml = motif_results_dir / 'meme_results' / 'meme_cleaned.xml'
+    meme_skipped = meme_summary_file.exists() and combined_fasta.exists() and cleaned_meme_xml.exists()
+
+    if meme_skipped:
+        logger.info("检测到MEME结果和精简版meme.xml已存在，跳过miRBase比对和MEME，直接运行TomTom")
+        # 读取已保存的去重motifs
+        with open(meme_summary_file, 'r') as f:
+            meme_summary_data = json.load(f)
+            unique_motifs = meme_summary_data.get('motifs', [])
     else:
         # Step 1: 确保miRBase序列存在
         mirbase_fasta = ensure_mirbase_fasta(config)
@@ -771,12 +881,22 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
             searchsize=meme_cfg.get('searchsize', 100000)
         )
 
+        # MEME运行后：对motifs进行去重
+        meme_xml_file = motif_results_dir / 'meme_results' / 'meme.xml'
+        all_motifs, _ = parse_meme_xml(meme_xml_file)
+        unique_motifs = deduplicate_motifs(all_motifs)
+
+        # 生成精简版meme.xml（只保留去重后的motifs）
+        cleaned_meme_xml = motif_results_dir / 'meme_results' / 'meme_cleaned.xml'
+        regenerate_meme_xml(meme_xml_file, cleaned_meme_xml, unique_motifs)
+
         # 保存MEME摘要JSON（Snakemake需要）
         meme_summary_file.parent.mkdir(parents=True, exist_ok=True)
         meme_summary_data = {
             'success': meme_result.get('success', False),
-            'motifs_found': meme_result.get('motifs_found', 0),
-            'motifs': meme_result.get('motifs', []),
+            'motifs_found': len(unique_motifs),  # 使用去重后的数量
+            'motifs': unique_motifs,
+            'all_motifs_count': len(all_motifs),  # 原始数量
             'output_dir': meme_result.get('output_dir', '')
         }
         with open(meme_summary_file, 'w') as f:
@@ -795,11 +915,15 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
     with open(motif_results_dir / 'small_rna_motif_summary.json', 'w') as f:
         json.dump(summary, f, indent=2)
 
-    # Step 7: 运行TomTom与已知motif数据库比对
+    # Step 7: 运行TomTom与已知motif数据库比对（使用精简版meme.xml）
     tomtom_cfg = motif_cfg.get('tomtom', {})
     if tomtom_cfg.get('enabled', True) and meme_result.get('success', False):
+        # 优先使用精简版meme.xml
+        cleaned_meme_xml = motif_results_dir / 'meme_results' / 'meme_cleaned.xml'
+        tomtom_motif_file = str(cleaned_meme_xml if cleaned_meme_xml.exists() else motif_results_dir / 'meme_results' / 'meme.xml')
+
         tomtom_result = run_tomtom_analysis(
-            motif_file=str(motif_results_dir / 'meme_results' / 'meme.xml'),
+            motif_file=tomtom_motif_file,
             output_dir=str(motif_results_dir / 'tomtom_results'),
             database=tomtom_cfg.get('database', None),
             evalue_threshold=tomtom_cfg.get('evalue_threshold', 0.05),
@@ -814,7 +938,7 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
                 json.dump(tomtom_result, f, indent=2)
 
     logger.info(f"=== Small RNA Motif分析完成 ===")
-    logger.info(f"Motif发现数: {meme_result.get('motifs_found', 0)}")
+    logger.info(f"Motif发现数: {len(unique_motifs) if unique_motifs else meme_result.get('motifs_found', 0)}")
     logger.info(f"结果目录: {motif_results_dir}")
 
     return summary
