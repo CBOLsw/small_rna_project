@@ -73,12 +73,11 @@ def create_directories(config: Dict[str, Any]) -> None:
         config['directories']['processed'],
         config['directories']['results'],
         config['directories']['logs'],
-        config['directories']['reports'],
         os.path.join(config['directories']['results'], 'qc'),
         os.path.join(config['directories']['results'], 'alignment'),
         os.path.join(config['directories']['results'], 'counts'),
         os.path.join(config['directories']['results'], 'differential_expression'),
-        os.path.join(config['directories']['results'], 'motif_analysis'),
+        os.path.join(config['directories']['results'], 'small_rna_motif'),
     ]
 
     for directory in directories:
