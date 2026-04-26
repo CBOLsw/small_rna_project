@@ -674,7 +674,7 @@ def save_tomtom_summary(result: Dict[str, Any], output_dir: Path):
 
 
 def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
-    """运行完整的small RNA motif分析流程"""
+    """运行完整的small RNA motif分析流程（支持检查点，跳过已完成步骤）"""
     motif_cfg = config.get('motif_analysis', {})
     meme_cfg = motif_cfg.get('meme', {})
     mirbase_cfg = motif_cfg.get('mirbase', {})
@@ -692,77 +692,86 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
     motif_results_dir = results_dir / 'small_rna_motif'
     motif_results_dir.mkdir(parents=True, exist_ok=True)
 
-    # Step 1: 确保miRBase序列存在
-    mirbase_fasta = ensure_mirbase_fasta(config)
+    combined_fasta = motif_results_dir / 'mirna_reads.fasta'
+    meme_summary_file = motif_results_dir / 'meme_results' / 'meme_summary.json'
+    tomtom_summary_file = motif_results_dir / 'tomtom_results' / 'tomtom_summary.json'
 
-    # Step 2: 构建索引
-    if not build_mirbase_index(mirbase_fasta, index_path, threads):
-        return {'success': False, 'error': 'miRBase索引构建失败'}
-
-    # Step 3: 获取所有样本
-    metadata_file = config.get('samples', {}).get('metadata_file', 'data/metadata/sample_info.csv')
-    if os.path.exists(metadata_file):
-        df = pd.read_csv(metadata_file)
-        samples = df[config['samples']['sample_column']].tolist()
-    else:
-        samples = ["GAO_1", "GAO_2", "GAO_3", "PAL_1", "PAL_2", "PAL_3"]
-
-    # Step 4: 每个样本比对到miRBase
-    all_reads = []
-    sample_stats = {}
-
-    for sample in samples:
-        trimmed_fastq = get_sample_trimmed_fastq(sample, config)
-        sam_file = motif_results_dir / f"{sample}_mirbase.sam"
-
-        success, mapped = map_to_mirbase(
-            trimmed_fastq, index_path, str(sam_file),
-            min_len, max_len, max_misms, threads
-        )
-        sample_stats[sample] = {
-            'success': success,
-            'mapped_reads': mapped
+    # 检查点：TomTom结果已存在，直接跳过整个分析
+    if tomtom_summary_file.exists():
+        logger.info("检测到TomTom结果已存在，跳过全部分析")
+        with open(tomtom_summary_file, 'r') as f:
+            tomtom_data = json.load(f)
+        return {
+            'success': True,
+            'skipped': True,
+            'message': 'TomTom结果已存在，跳过分析',
+            'tomtom_result': tomtom_data
         }
 
-        # 提取reads
-        if success and sam_file.exists():
-            reads = extract_mirna_reads_direct(str(trimmed_fastq), str(sam_file), min_len, max_len)
-            all_reads.extend(reads)
-            logger.info(f"  {sample}: 提取{len(reads)}条reads")
+    # 检查点：MEME结果已存在，跳过miRBase比对和MEME
+    meme_skipped = False
+    if meme_summary_file.exists() and combined_fasta.exists():
+        logger.info("检测到MEME结果已存在，跳过miRBase比对和MEME，直接运行TomTom")
+        meme_result = {'success': True, 'skipped': True}
+        all_reads = []
+        sample_stats = {}
+        meme_skipped = True
+    else:
+        # Step 1: 确保miRBase序列存在
+        mirbase_fasta = ensure_mirbase_fasta(config)
 
-    # Step 5: 保存合并的reads
-    combined_fasta = motif_results_dir / 'mirna_reads.fasta'
-    save_reads_to_fasta(all_reads, str(combined_fasta))
+        # Step 2: 构建索引
+        if not build_mirbase_index(mirbase_fasta, index_path, threads):
+            return {'success': False, 'error': 'miRBase索引构建失败'}
 
-    # Step 6: 运行MEME
-    meme_result = run_meme_on_small_rna(
-        str(combined_fasta),
-        str(motif_results_dir / 'meme_results'),
-        width_min=meme_cfg.get('min_width', 5),
-        width_max=meme_cfg.get('max_width', 8),
-        max_motifs=meme_cfg.get('max_motifs', 3),
-        evalue_threshold=meme_cfg.get('evalue_threshold', 1e-4),
-        min_sites=meme_cfg.get('minsites', 10),
-        max_sites=meme_cfg.get('maxsites', 100),
-        searchsize=meme_cfg.get('searchsize', 100000)
-    )
+        # Step 3: 获取所有样本
+        metadata_file = config.get('samples', {}).get('metadata_file', 'data/metadata/sample_info.csv')
+        if os.path.exists(metadata_file):
+            df = pd.read_csv(metadata_file)
+            samples = df[config['samples']['sample_column']].tolist()
+        else:
+            samples = ["GAO_1", "GAO_2", "GAO_3", "PAL_1", "PAL_2", "PAL_3"]
 
-    # 保存结果摘要
-    summary = {
-        'success': meme_result.get('success', False),
-        'samples': sample_stats,
-        'total_unique_reads': len(set(all_reads)),
-        'combined_fasta': str(combined_fasta),
-        'meme_result': meme_result
-    }
+        # Step 4: 每个样本比对到miRBase
+        all_reads = []
+        sample_stats = {}
 
-    # 保存主摘要JSON
-    with open(motif_results_dir / 'small_rna_motif_summary.json', 'w') as f:
-        json.dump(summary, f, indent=2)
+        for sample in samples:
+            trimmed_fastq = get_sample_trimmed_fastq(sample, config)
+            sam_file = motif_results_dir / f"{sample}_mirbase.sam"
 
-    # 保存MEME摘要JSON（Snakemake需要）
-    meme_summary_file = motif_results_dir / 'meme_results' / 'meme_summary.json'
-    if meme_summary_file.parent.exists() or meme_summary_file.parent == motif_results_dir / 'meme_results':
+            success, mapped = map_to_mirbase(
+                trimmed_fastq, index_path, str(sam_file),
+                min_len, max_len, max_misms, threads
+            )
+            sample_stats[sample] = {
+                'success': success,
+                'mapped_reads': mapped
+            }
+
+            # 提取reads
+            if success and sam_file.exists():
+                reads = extract_mirna_reads_direct(str(trimmed_fastq), str(sam_file), min_len, max_len)
+                all_reads.extend(reads)
+                logger.info(f"  {sample}: 提取{len(reads)}条reads")
+
+        # Step 5: 保存合并的reads
+        save_reads_to_fasta(all_reads, str(combined_fasta))
+
+        # Step 6: 运行MEME
+        meme_result = run_meme_on_small_rna(
+            str(combined_fasta),
+            str(motif_results_dir / 'meme_results'),
+            width_min=meme_cfg.get('min_width', 5),
+            width_max=meme_cfg.get('max_width', 8),
+            max_motifs=meme_cfg.get('max_motifs', 3),
+            evalue_threshold=meme_cfg.get('evalue_threshold', 1e-4),
+            min_sites=meme_cfg.get('minsites', 10),
+            max_sites=meme_cfg.get('maxsites', 100),
+            searchsize=meme_cfg.get('searchsize', 100000)
+        )
+
+        # 保存MEME摘要JSON（Snakemake需要）
         meme_summary_file.parent.mkdir(parents=True, exist_ok=True)
         meme_summary_data = {
             'success': meme_result.get('success', False),
@@ -772,6 +781,19 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
         }
         with open(meme_summary_file, 'w') as f:
             json.dump(meme_summary_data, f, indent=2)
+
+    # 保存结果摘要
+    summary = {
+        'success': meme_result.get('success', False),
+        'samples': sample_stats,
+        'total_unique_reads': len(set(all_reads)) if all_reads else 0,
+        'combined_fasta': str(combined_fasta),
+        'meme_result': meme_result
+    }
+
+    # 保存主摘要JSON
+    with open(motif_results_dir / 'small_rna_motif_summary.json', 'w') as f:
+        json.dump(summary, f, indent=2)
 
     # Step 7: 运行TomTom与已知motif数据库比对
     tomtom_cfg = motif_cfg.get('tomtom', {})
@@ -792,8 +814,6 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
                 json.dump(tomtom_result, f, indent=2)
 
     logger.info(f"=== Small RNA Motif分析完成 ===")
-    logger.info(f"总样本数: {len(samples)}")
-    logger.info(f"总唯一reads: {len(set(all_reads))}")
     logger.info(f"Motif发现数: {meme_result.get('motifs_found', 0)}")
     logger.info(f"结果目录: {motif_results_dir}")
 
