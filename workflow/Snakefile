@@ -293,7 +293,7 @@ rule mirbase_alignment:
         expand(os.path.join(config["directories"]["processed"], "{sample}_trimmed.fastq.gz"), sample=[s[0] for s in SAMPLES])
     output:
         fasta=os.path.join(config["directories"]["results"], "small_rna_motif", "mirna_reads.fasta"),
-        expand(os.path.join(config["directories"]["results"], "small_rna_motif", "{sample}_mirbase.sam"), sample=[s[0] for s in SAMPLES])
+        sam_files=expand(os.path.join(config["directories"]["results"], "small_rna_motif", "{sample}_mirbase.sam"), sample=[s[0] for s in SAMPLES])
     log:
         os.path.join(LOG_DIR, "mirbase_alignment.log")
     threads: config["motif_analysis"]["meme"]["threads"]
