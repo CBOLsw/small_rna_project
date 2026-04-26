@@ -19,11 +19,11 @@ TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update 
 
 #### Scenario: small RNA优化比对
 - **WHEN** 比对small RNA测序数据
-- **THEN** 系统使用Bowtie2的--local模式，设置seed length为15，允许最多2个错配，报告最佳比对位置
+- **THEN** 系统使用Bowtie2的--local模式，设置seed length为15，允许最多1个错配，报告最佳比对位置
 
-#### Scenario: 配对端数据处理
-- **WHEN** 输入配对端fastq文件
-- **THEN** 系统正确处理R1和R2文件，确保配对信息一致性，过滤不配对的reads
+#### Scenario: 单端数据处理
+- **WHEN** 输入单端fastq文件
+- **THEN** 系统使用Bowtie2的-U参数输入单端reads，进行比对
 
 #### Scenario: SAM格式输出
 - **WHEN** 比对完成
