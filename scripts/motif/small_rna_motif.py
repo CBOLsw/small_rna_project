@@ -342,17 +342,13 @@ def run_meme_on_small_rna(fasta_file: str, output_dir: str,
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=600)
         logger.info("MEME分析完成")
 
-        # 解析结果
+        # 解析结果（不去重，主流程会用meme.xml进行完整去重）
         motifs = parse_meme_result(output_path / 'meme.txt') if (output_path / 'meme.txt').exists() else []
-
-        # 去重（去除正向/反向互补重复的motif）
-        unique_motifs = deduplicate_motifs(motifs)
 
         return {
             'success': True,
-            'motifs_found': len(unique_motifs),
-            'motifs': unique_motifs,
-            'all_motifs': motifs,  # 保留原始列表用于参考
+            'motifs_found': len(motifs),
+            'motifs': motifs,
             'output_dir': str(output_path)
         }
     except subprocess.TimeoutExpired:
