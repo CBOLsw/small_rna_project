@@ -451,96 +451,90 @@ def parse_meme_xml(xml_file: Path) -> Tuple[List[Dict[str, Any]], str]:
     import re
     motifs = []
 
-    # 匹配motif块：<motif id="SEQUENCE" name="MEME-N" e-value="..." width="..." ...>
-    # 然后提取后面的序列内容
+    # MEME XML格式：<motif id="motif_1" name="SEQUENCE" alt="MEME-1" ... e_value="..." ...>
+    # name属性是序列，alt属性是motif标识（如MEME-1）
     motif_pattern = re.compile(
-        r'<motif\s+id="([^"]+)"\s+name="([^"]+)"\s+e-value="([^"]+)"[^>]*>(.*?)</motif>',
+        r'<motif\s+id="([^"]+)"\s+name="([^"]+)"\s+alt="([^"]+)"[^>]*>',
         re.DOTALL
     )
 
     for match in motif_pattern.finditer(content):
-        motif_id = match.group(1)
-        motif_name = match.group(2)
-        evalue = match.group(3)
-        motif_content = match.group(4)
+        motif_id = match.group(1)  # e.g., "motif_1"
+        motif_sequence = match.group(2)  # e.g., "ACTACCTC"
+        motif_alt = match.group(3)  # e.g., "MEME-1"
 
-        # 提取序列
-        seq_match = re.search(r'<sequence>(.*?)</sequence>', motif_content, re.DOTALL)
-        sequence = seq_match.group(1).strip() if seq_match else ""
+        # 提取e_value（可能在任意位置）
+        e_value_match = re.search(r'e_value="([^"]+)"', match.group(0))
+        e_value = float(e_value_match.group(1)) if e_value_match else float('inf')
 
         motifs.append({
             'id': motif_id,
-            'name': motif_name,
-            'evalue': float(evalue) if evalue else float('inf'),
-            'sequence': sequence,
-            'normalized_seq': normalize_motif(sequence)
+            'sequence': motif_sequence,
+            'alt': motif_alt,  # 实际motif名称如"MEME-1"
+            'name': motif_alt,  # 用于兼容
+            'evalue': e_value,
+            'normalized_seq': normalize_motif(motif_sequence)
         })
 
     return motifs, content
 
 
-def regenerate_meme_xml(xml_file: Path, output_file: Path, unique_motifs: List[Dict[str, Any]]):
-    """根据去重后的motifs重新生成精简版meme.xml"""
+def create_clean_meme_xml(xml_file: Path, output_file: Path, unique_motifs: List[Dict[str, Any]]):
+    """根据去重后的motifs生成精简版meme.xml（仅包含motifs标签内的内容）"""
     if not xml_file.exists():
         logger.warning(f"原始meme.xml不存在，无法生成精简版")
         return
 
+    import re
+
+    # 解析原始XML
     with open(xml_file, 'r') as f:
         content = f.read()
 
     # 提取每个motif的完整XML块
-    import re
     motif_blocks = {}
     motif_pattern = re.compile(
-        r'(<motif\s+id="[^"]+"\s+name="([^"]+)"[^>]*>.*?</motif>)',
+        r'(<motif\s+id="motif_\d+"\s+name="[^"]+"\s+alt="([^"]+)"[^>]*>.*?</motif>)',
         re.DOTALL
     )
 
     for match in motif_pattern.finditer(content):
         full_block = match.group(1)
-        motif_name = match.group(2)
-        motif_blocks[motif_name] = full_block
+        motif_alt = match.group(2)  # e.g., "MEME-1"
+        motif_blocks[motif_alt] = full_block
 
-    # 收集需要保留的motif名称
-    keep_names = set()
+    # 收集需要保留的motif alt名称
+    keep_alts = set()
     for motif in unique_motifs:
-        # motif的name格式是"MEME-1"等
-        if 'name' in motif:
-            keep_names.add(motif['name'])
+        if 'alt' in motif:
+            keep_alts.add(motif['alt'])
 
-    # 生成新的XML：保留原始的header，只保留去重后的motifs
-    lines = content.split('\n')
-    new_lines = []
-    in_motifs_section = False
-    motifs_added = set()
+    # 生成精简版XML：保留原始header，motifs部分只包含去重后的
+    # 找到<motifs>和</motifs>标签
+    motifs_start = content.find('<motifs>')
+    motifs_end = content.find('</motifs>')
 
-    for line in lines:
-        if '<motifs>' in line or '<motif ' in line:
-            in_motifs_section = True
+    if motifs_start == -1 or motifs_end == -1:
+        logger.warning("无法在meme.xml中找到<motifs>标签")
+        return
 
-        if not in_motifs_section:
-            new_lines.append(line)
-            continue
+    # 提取header部分（从开始到<motifs>之前）
+    header = content[:motifs_start]
 
-        # 在motifs标签内
-        if '</motifs>' in line:
-            # 添加需要保留的motifs
-            for motif_name in sorted(keep_names, key=lambda x: int(x.split('-')[1]) if '-' in x else 0):
-                if motif_name in motif_blocks and motif_name not in motifs_added:
-                    new_lines.append(motif_blocks[motif_name])
-                    motifs_added.add(motif_name)
-            in_motifs_section = False
-            new_lines.append(line)
-        elif '<motif ' in line or '</motif>' in line:
-            # 跳过原始的motifs，稍后统一添加
-            continue
-        else:
-            new_lines.append(line)
+    # 生成新的motifs部分
+    new_motifs_lines = ['<motifs>']
+    for alt in sorted(keep_alts, key=lambda x: int(x.split('-')[1]) if '-' in x else 0):
+        if alt in motif_blocks:
+            new_motifs_lines.append(motif_blocks[alt])
+    new_motifs_lines.append('</motifs>')
+
+    # 合成完整XML
+    new_content = header + '\n'.join(new_motifs_lines)
 
     with open(output_file, 'w') as f:
-        f.write('\n'.join(new_lines))
+        f.write(new_content)
 
-    logger.info(f"已生成精简版meme.xml: {output_file}（保留{len(motifs_added)}个唯一motifs）")
+    logger.info(f"已生成精简版meme.xml: {output_file}（保留{len(keep_alts)}个唯一motifs）")
 
 
 def check_tomtom_installed(tomtom_path: str = "tomtom") -> bool:
@@ -890,7 +884,7 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
 
         # 生成精简版meme.xml（只保留去重后的motifs）
         cleaned_meme_xml = motif_results_dir / 'meme_results' / 'meme_cleaned.xml'
-        regenerate_meme_xml(meme_xml_file, cleaned_meme_xml, unique_motifs)
+        create_clean_meme_xml(meme_xml_file, cleaned_meme_xml, unique_motifs)
 
         # 保存MEME摘要JSON（Snakemake需要）
         meme_summary_file.parent.mkdir(parents=True, exist_ok=True)
