@@ -561,22 +561,23 @@ def ensure_motif_database(database: Optional[str] = None) -> Optional[str]:
     """确保motif数据库可用，优先使用本地JASPAR数据库，必要时自动下载"""
     import urllib.request
 
-    # 检查项目本地路径
-    local_db = Path("references/motif_databases/JASPAR/JASPAR2024_CORE_vertebrates_non-redundant.meme")
-    if local_db.exists():
-        logger.info(f"使用本地数据库: {local_db}")
-        return str(local_db)
+    # 优先检查项目本地路径（使用glob匹配任意版本）
+    for db_path in Path("references/motif_databases/JASPAR").glob("JASPAR*.meme"):
+        logger.info(f"使用本地数据库: {db_path}")
+        return str(db_path)
 
-    old_db = Path("references/motif_databases/JASPAR/JASPAR2022_CORE_vertebrates_non-redundant.meme")
-    if old_db.exists():
-        logger.info(f"使用本地数据库: {old_db}")
-        return str(old_db)
+    # 也检查不带扩展名的文件
+    for db_path in Path("references/motif_databases/JASPAR").glob("JASPAR*"):
+        if db_path.is_file():
+            logger.info(f"使用本地数据库: {db_path}")
+            return str(db_path)
 
     # 检查MEME默认安装路径
     for prefix in ["/usr/local", "/usr", os.path.expanduser("~/miniconda3/envs/small_rna_analysis")]:
         for db_path in [
             f"{prefix}/share/meme/db/motif_databases/JASPAR/JASPAR2024_CORE_vertebrates_non-redundant.meme",
             f"{prefix}/share/meme/db/motif_databases/JASPAR/JASPAR2022_CORE_vertebrates_non-redundant.meme",
+            f"{prefix}/share/meme/db/motif_databases/JASPAR/JASPAR2026_CORE_vertebrates_non-redundant.meme",
         ]:
             if Path(db_path).exists():
                 logger.info(f"使用系统数据库: {db_path}")
@@ -646,10 +647,11 @@ def run_tomtom_analysis(motif_file: str, output_dir: str,
 
     try:
         # 构建TomTom命令
+        # TomTom使用 -thresh 而不是 -evalue
         cmd = [
             'tomtom',
             '-o', str(output_path),
-            '-evalue', str(evalue_threshold),
+            '-thresh', str(evalue_threshold),
             '-min-overlap', str(min_overlap),
             '-text',  # 输出文本格式便于解析
             motif_file,
