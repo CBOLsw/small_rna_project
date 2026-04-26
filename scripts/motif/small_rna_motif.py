@@ -806,18 +806,13 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
     all_reads = []
     sample_stats = {}
     meme_result = {'success': False}
-    unique_motifs = []
+    meme_xml_file = motif_results_dir / 'meme_results' / 'meme.xml'
 
     # 检查点：MEME结果已存在，跳过miRBase比对和MEME
-    cleaned_meme_xml = motif_results_dir / 'meme_results' / 'meme_cleaned.xml'
-    meme_skipped = meme_summary_file.exists() and combined_fasta.exists() and cleaned_meme_xml.exists()
+    meme_skipped = meme_summary_file.exists() and combined_fasta.exists() and meme_xml_file.exists()
 
     if meme_skipped:
-        logger.info("检测到MEME结果和精简版meme.xml已存在，跳过miRBase比对和MEME，直接运行TomTom")
-        # 读取已保存的去重motifs
-        with open(meme_summary_file, 'r') as f:
-            meme_summary_data = json.load(f)
-            unique_motifs = meme_summary_data.get('motifs', [])
+        logger.info("检测到MEME结果已存在，跳过miRBase比对和MEME，直接运行TomTom")
     else:
         # Step 1: 确保miRBase序列存在
         mirbase_fasta = ensure_mirbase_fasta(config)
@@ -873,22 +868,12 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
             searchsize=meme_cfg.get('searchsize', 100000)
         )
 
-        # MEME运行后：对motifs进行去重
-        meme_xml_file = motif_results_dir / 'meme_results' / 'meme.xml'
-        all_motifs, _ = parse_meme_xml(meme_xml_file)
-        unique_motifs = deduplicate_motifs(all_motifs)
-
-        # 生成精简版meme.xml（只保留去重后的motifs）
-        cleaned_meme_xml = motif_results_dir / 'meme_results' / 'meme_cleaned.xml'
-        create_clean_meme_xml(meme_xml_file, cleaned_meme_xml, unique_motifs)
-
         # 保存MEME摘要JSON（Snakemake需要）
         meme_summary_file.parent.mkdir(parents=True, exist_ok=True)
         meme_summary_data = {
             'success': meme_result.get('success', False),
-            'motifs_found': len(unique_motifs),  # 使用去重后的数量
-            'motifs': unique_motifs,
-            'all_motifs_count': len(all_motifs),  # 原始数量
+            'motifs_found': meme_result.get('motifs_found', 0),
+            'motifs': meme_result.get('motifs', []),
             'output_dir': meme_result.get('output_dir', '')
         }
         with open(meme_summary_file, 'w') as f:
@@ -907,15 +892,11 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
     with open(motif_results_dir / 'small_rna_motif_summary.json', 'w') as f:
         json.dump(summary, f, indent=2)
 
-    # Step 7: 运行TomTom与已知motif数据库比对（使用精简版meme.xml）
+    # Step 7: 运行TomTom与已知motif数据库比对
     tomtom_cfg = motif_cfg.get('tomtom', {})
     if tomtom_cfg.get('enabled', True) and meme_result.get('success', False):
-        # 优先使用精简版meme.xml
-        cleaned_meme_xml = motif_results_dir / 'meme_results' / 'meme_cleaned.xml'
-        tomtom_motif_file = str(cleaned_meme_xml if cleaned_meme_xml.exists() else motif_results_dir / 'meme_results' / 'meme.xml')
-
         tomtom_result = run_tomtom_analysis(
-            motif_file=tomtom_motif_file,
+            motif_file=str(meme_xml_file),
             output_dir=str(motif_results_dir / 'tomtom_results'),
             database=tomtom_cfg.get('database', None),
             evalue_threshold=tomtom_cfg.get('evalue_threshold', 0.05),
@@ -930,7 +911,7 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
                 json.dump(tomtom_result, f, indent=2)
 
     logger.info(f"=== Small RNA Motif分析完成 ===")
-    logger.info(f"Motif发现数: {len(unique_motifs) if unique_motifs else meme_result.get('motifs_found', 0)}")
+    logger.info(f"Motif发现数: {meme_result.get('motifs_found', 0)}")
     logger.info(f"结果目录: {motif_results_dir}")
 
     return summary
