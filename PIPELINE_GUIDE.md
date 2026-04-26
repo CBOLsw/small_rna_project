@@ -26,6 +26,7 @@ small_rna_project/
 │   ├── hg38.fa(.gz)       # hg38 基因组序列
 │   ├── hg38.knownGene.gtf(.gz)  # 基因注释
 │   ├── hg38.mirbase.gff3  # miRBase small RNA 注释
+│   ├── hsa.mature.fa       # 人类成熟miRNA序列 (自动下载)
 │   └── bowtie2_index/     # Bowtie2 索引 (自动构建)
 ├── scripts/                # 分析脚本
 │   ├── qc/               # 质量控制脚本
@@ -192,15 +193,16 @@ differential_expression:
     padj_threshold: 0.05
     log2fc_threshold: 1.0
 
-# 5. Motif 分析
+# 5. Small RNA Motif 分析
 motif_analysis:
+  mirbase:
+    min_len: 18
+    max_len: 35
   meme:
-    min_width: 6
-    max_width: 12
-    max_motifs: 10
-  tomtom:
-    database: "JASPAR_vertebrates"
-    evalue_threshold: 0.05
+    min_width: 5
+    max_width: 8
+    max_motifs: 3
+    searchsize: 100000
 ```
 
 ## 分析结果说明
@@ -213,12 +215,15 @@ motif_analysis:
 | `alignment/` | BAM 文件、比对统计信息 |
 | `counts/` | 基因表达矩阵 (gene_counts.csv) |
 | `differential_expression/` | DEGs列表、火山图、热图 |
-| `motif_analysis/` | MEME motif结果、TomTom比对、可视化 |
+| `small_rna_motif/` | Small RNA motif分析结果（miRBase比对、唯一reads、MEME motifs）|
 
 ## 常见问题
 
-### 1. 提示 "reports 目录不存在"
-这是正常的，Snakemake 会自动创建。
+### 1. Snakemake 锁定
+如果流程中断后无法重启：
+```bash
+rm -rf .snakemake/lock
+```
 
 ### 2. 参考基因组下载慢
 建议手动下载 `.gz` 文件放到 `references/` 目录，脚本会自动跳过下载直接解压。
