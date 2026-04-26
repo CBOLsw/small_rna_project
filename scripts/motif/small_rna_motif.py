@@ -286,16 +286,22 @@ def extract_mirna_reads_direct(trimmed_fastq: str, sam_file: str,
 
 
 def save_reads_to_fasta(reads: List[str], output_fasta: str, max_seqs: int = 0):
-    """将reads保存为FASTA格式，带去重"""
-    seen = set()
-    unique_reads = []
+    """将reads保存为FASTA格式，带去重（同时去除反向互补重复）"""
+    seen = set()  # 存储规范化后的序列
+    unique_reads = []  # 存储原始序列（保留第一个出现的）
     for seq in reads:
-        if seq not in seen:
-            seen.add(seq)
+        # 规范化：取正向和反向互补中字典序较小的
+        norm_seq = normalize_motif(seq)
+        if norm_seq not in seen:
+            seen.add(norm_seq)
             unique_reads.append(seq)
 
+    original_count = len(reads)
+    unique_count = len(unique_reads)
+    logger.info(f"序列去重：原始{original_count}条 → 去重后{unique_count}条（去除{original_count - unique_count}条重复/反向互补序列）")
+
     if max_seqs > 0 and len(unique_reads) > max_seqs:
-        logger.info(f"序列过多({len(unique_reads)})，随机取{max_seqs}条")
+        logger.info(f"序列过多({unique_count})，随机取{max_seqs}条")
         import random
         random.seed(42)
         unique_reads = random.sample(unique_reads, max_seqs)
