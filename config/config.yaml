@@ -30,6 +30,9 @@ reference:
   bowtie2_index: "references/bowtie2_index/hg38"
   gtf_annotation: "references/hg38.knownGene.gtf"
   gtf_annotation_gz: "references/hg38.knownGene.gtf.gz"
+  # miRBase参考序列（用于small RNA motif分析）
+  mirbase_fasta: "references/hsa.mature.fa"
+  mirbase_bowtie2_index: "references/bowtie2_index/hsa_mirbase"
 
 # 质量控制参数
 quality_control:
@@ -76,16 +79,23 @@ differential_expression:
     control_group: "GAO"
     treatment_group: "PAL"
 
-# motif分析参数
+# motif分析参数（small RNA motif分析专用）
+# 流程：fastq -> trim -> map to miRBase -> extract miRNA reads -> MEME motif发现
 motif_analysis:
+  # miRBase比对参数
+  mirbase:
+    min_len: 18      # 最小small RNA长度
+    max_len: 35      # 最大small RNA长度
+    max_mismatches: 1  # 最大错配数
+  # MEME motif发现参数（针对small RNA优化）
   meme:
-    min_width: 6
-    max_width: 10
+    min_width: 5
+    max_width: 8
     max_motifs: 3
     evalue_threshold: 1e-4
     minsites: 10
-    maxsites: 50
-    searchsize: 1000000
+    maxsites: 100
+    searchsize: 100000
     threads: 8
   tomtom:
     database: "JASPAR_vertebrates"
@@ -93,9 +103,9 @@ motif_analysis:
     min_overlap: 5
   filtering:
     evalue_threshold: 1e-4
-    min_sites: 5
-    min_width: 6
-    max_width: 12
+    min_sites: 10
+    min_width: 5
+    max_width: 8
 
 # Snakemake配置
 snakemake:

@@ -66,12 +66,10 @@ rule all:
         os.path.join(config["directories"]["results"], "differential_expression", "volcano_plot.png"),
         os.path.join(config["directories"]["results"], "differential_expression", "heatmap.png"),
 
-        # Motif分析
-        os.path.join(config["directories"]["results"], "motif_analysis", "gene_sequences.fasta"),
-        os.path.join(config["directories"]["results"], "motif_analysis", "meme_results", "meme_summary.json"),
-        os.path.join(config["directories"]["results"], "motif_analysis", "filtered_motifs.csv"),
-        os.path.join(config["directories"]["results"], "motif_analysis", "tomtom_results", "tomtom_summary.json"),
-        os.path.join(config["directories"]["results"], "motif_analysis", "visualization", "motif_overview.png")
+        # Small RNA Motif分析
+        os.path.join(config["directories"]["results"], "small_rna_motif", "small_rna_motif_summary.json"),
+        os.path.join(config["directories"]["results"], "small_rna_motif", "mirna_reads.fasta"),
+        os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", "meme_summary.json")
 
 
 # ==================== 数据质量控制 ====================
@@ -285,112 +283,24 @@ rule deseq2_analysis:
         """
 
 
-# ==================== Motif分析 ====================
+# ==================== Small RNA Motif分析 ====================
 
-rule extract_sequences:
-    """提取差异表达基因的序列"""
+rule small_rna_motif:
+    """Small RNA motif分析：比对到miRBase -> 提取reads -> MEME motif发现"""
     input:
-        degs=os.path.join(config["directories"]["results"], "differential_expression", "filtered_degs.csv"),
-        genome=config["reference"]["genome_fasta"],
-        annotation=config["reference"]["gtf_annotation"]
+        # 需要先完成trimming
+        expand(os.path.join(config["directories"]["processed"], "{sample}_trimmed.fastq.gz"), sample=[s[0] for s in SAMPLES])
     output:
-        fasta=os.path.join(config["directories"]["results"], "motif_analysis", "gene_sequences.fasta")
+        summary=os.path.join(config["directories"]["results"], "small_rna_motif", "small_rna_motif_summary.json"),
+        fasta=os.path.join(config["directories"]["results"], "small_rna_motif", "mirna_reads.fasta"),
+        meme_summary=os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", "meme_summary.json")
     log:
-        os.path.join(LOG_DIR, "extract_sequences.log")
-    shell:
-        """
-        python scripts/motif/extract_sequences.py \
-            --genes {input.degs} \
-            --genome {input.genome} \
-            --annotation {input.annotation} \
-            --output {output.fasta} \
-            2>&1 | tee {log}
-        """
-
-
-rule run_meme:
-    """运行MEME motif分析"""
-    input:
-        fasta=os.path.join(config["directories"]["results"], "motif_analysis", "gene_sequences.fasta")
-    output:
-        summary=os.path.join(config["directories"]["results"], "motif_analysis", "meme_results", "meme_summary.json")
-    log:
-        os.path.join(LOG_DIR, "run_meme.log")
+        os.path.join(LOG_DIR, "small_rna_motif.log")
     threads: config["motif_analysis"]["meme"]["threads"]
     shell:
         """
-        python scripts/motif/run_meme.py \
-            --fasta {input.fasta} \
-            --output {config[directories][results]}/motif_analysis/meme_results \
-            --width '{config[motif_analysis][meme][min_width]},{config[motif_analysis][meme][max_width]}' \
-            --nmotifs {config[motif_analysis][meme][max_motifs]} \
-            --evalth {config[motif_analysis][meme][evalue_threshold]} \
-            --minsites {config[motif_analysis][meme][minsites]} \
-            --maxsites {config[motif_analysis][meme][maxsites]} \
-            --searchsize {config[motif_analysis][meme][searchsize]} \
-            --threads {threads} \
-            2>&1 | tee {log}
-        """
-
-
-rule filter_motifs:
-    """过滤motif结果"""
-    input:
-        meme_summary=os.path.join(config["directories"]["results"], "motif_analysis", "meme_results", "meme_summary.json")
-    output:
-        os.path.join(config["directories"]["results"], "motif_analysis", "filtered_motifs.csv")
-    log:
-        os.path.join(LOG_DIR, "filter_motifs.log")
-    shell:
-        """
-        python scripts/motif/filter_motifs.py \
-            --meme {config[directories][results]}/motif_analysis/meme_results \
-            --output {config[directories][results]}/motif_analysis \
-            --evalue {config[motif_analysis][filtering][evalue_threshold]} \
-            --min-sites {config[motif_analysis][filtering][min_sites]} \
-            --min-width {config[motif_analysis][filtering][min_width]} \
-            --max-width {config[motif_analysis][filtering][max_width]} \
-            2>&1 | tee {log}
-        """
-
-
-rule run_tomtom:
-    """运行TomTom motif比较分析"""
-    input:
-        meme_summary=os.path.join(config["directories"]["results"], "motif_analysis", "meme_results", "meme_summary.json")
-    output:
-        summary=os.path.join(config["directories"]["results"], "motif_analysis", "tomtom_results", "tomtom_summary.json")
-    log:
-        os.path.join(LOG_DIR, "run_tomtom.log")
-    shell:
-        """
-        python scripts/motif/tomtom_comparison.py \
-            --meme-output {config[directories][results]}/motif_analysis/meme_results \
-            --output {config[directories][results]}/motif_analysis/tomtom_results \
-            --db {config[motif_analysis][tomtom][database]} \
-            --evalth {config[motif_analysis][tomtom][evalue_threshold]} \
-            --min-overlap {config[motif_analysis][tomtom][min_overlap]} \
-            2>&1 | tee {log}
-        """
-
-
-rule visualize_motifs:
-    """可视化motif结果"""
-    input:
-        meme_summary=os.path.join(config["directories"]["results"], "motif_analysis", "meme_results", "meme_summary.json"),
-        filtered_motifs=os.path.join(config["directories"]["results"], "motif_analysis", "filtered_motifs.csv")
-    output:
-        overview=os.path.join(config["directories"]["results"], "motif_analysis", "visualization", "motif_overview.png")
-    log:
-        os.path.join(LOG_DIR, "visualize_motifs.log")
-    shell:
-        """
-        python scripts/motif/visualize_motifs.py \
-            --meme {config[directories][results]}/motif_analysis/meme_results \
-            --filtered {config[directories][results]}/motif_analysis \
-            --output {config[directories][results]}/motif_analysis/visualization \
-            --format {config[visualization][figure_format]} \
-            --dpi {config[visualization][dpi]} \
+        python scripts/motif/small_rna_motif.py \
+            --config config/config.yaml \
             2>&1 | tee {log}
         """
 
@@ -407,10 +317,8 @@ rule create_directories:
         os.path.join(config["directories"]["results"], "alignment", ".dir_exists"),
         os.path.join(config["directories"]["results"], "counts", ".dir_exists"),
         os.path.join(config["directories"]["results"], "differential_expression", ".dir_exists"),
-        os.path.join(config["directories"]["results"], "motif_analysis", ".dir_exists"),
-        os.path.join(config["directories"]["results"], "motif_analysis", "meme_results", ".dir_exists"),
-        os.path.join(config["directories"]["results"], "motif_analysis", "tomtom_results", ".dir_exists"),
-        os.path.join(config["directories"]["results"], "motif_analysis", "visualization", ".dir_exists")
+        os.path.join(config["directories"]["results"], "small_rna_motif", ".dir_exists"),
+        os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", ".dir_exists")
     shell:
         """
         mkdir -p {config[directories][processed]} \
@@ -418,9 +326,7 @@ rule create_directories:
                  {config[directories][results]}/alignment \
                  {config[directories][results]}/counts \
                  {config[directories][results]}/differential_expression \
-                 {config[directories][results]}/motif_analysis/meme_results \
-                 {config[directories][results]}/motif_analysis/tomtom_results \
-                 {config[directories][results]}/motif_analysis/visualization \
+                 {config[directories][results]}/small_rna_motif/meme_results \
                  {config[directories][reports]}
         touch {output}
         """

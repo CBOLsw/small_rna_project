@@ -47,12 +47,12 @@ def check_meme_installed(meme_path: str = "meme") -> bool:
 
 
 def run_meme_analysis(fasta_file: str, output_dir: str,
-                     width_min: int = 6, width_max: int = 10,
+                     width_min: int = 5, width_max: int = 8,
                      max_motifs: int = 3, evalue_threshold: float = 1e-4,
                      num_threads: int = 1,
-                     min_sites: int = 10, max_sites: int = 50,
+                     min_sites: int = 10, max_sites: int = 100,
                      max_retries: int = 3,
-                     searchsize: int = 1000000) -> Dict[str, Any]:
+                     searchsize: int = 100000) -> Dict[str, Any]:
     """
     运行MEME motif分析
 
@@ -100,7 +100,7 @@ def run_meme_analysis(fasta_file: str, output_dir: str,
         fasta_file,
         '-oc', str(output_path),   # -oc 允许覆盖已有目录
         '-dna',                    # DNA序列
-        '-mod', 'oops',            # 一次出现模型（每条短序列至多一个motif，适合small RNA）
+        '-mod', 'zoops',           # 零或一次出现模型（small RNA非每条都有motif）
         '-nmotifs', str(max_motifs),
         '-minw', str(width_min),
         '-maxw', str(width_max),
@@ -306,8 +306,8 @@ def main():
                        help='输出目录（将在此目录下创建MEME结果）')
 
     # 可选参数
-    parser.add_argument('--width', type=str, default='6,10',
-                       help='motif宽度范围，格式: min,max（默认: 6,10）')
+    parser.add_argument('--width', type=str, default='5,8',
+                       help='motif宽度范围，格式: min,max（默认: 5,8）')
     parser.add_argument('--nmotifs', type=int, default=3,
                        help='最大motif数（默认: 3）')
     parser.add_argument('--evalth', type=float, default=1e-4,
@@ -315,12 +315,12 @@ def main():
 
     parser.add_argument('--minsites', type=int, default=10,
                        help='每个motif最少位点数（默认: 10）')
-    parser.add_argument('--maxsites', type=int, default=50,
-                       help='每个motif最多位点数（默认: 50）')
+    parser.add_argument('--maxsites', type=int, default=100,
+                       help='每个motif最多位点数（默认: 100）')
     parser.add_argument('--threads', type=int, default=1,
                        help='并行线程数（默认: 1）')
-    parser.add_argument('--searchsize', type=int, default=1000000,
-                       help='MEME序列搜索长度限制（默认: 1000000）')
+    parser.add_argument('--searchsize', type=int, default=100000,
+                       help='MEME序列搜索长度限制（默认: 100000）')
 
     args = parser.parse_args()
 

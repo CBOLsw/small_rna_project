@@ -432,15 +432,13 @@ class Bowtie2Aligner:
                 view_process.stdout.close()
                 sort_stdout, sort_stderr = sort_process.communicate()
 
-                # 检查错误
-                if view_process.returncode != 0:
-                    logger.error(f"SAM到BAM转换步骤失败，返回码: {view_process.returncode}")
-                    if view_process.stderr:
-                        logger.error(f"错误信息: {view_process.stderr.read().decode() if hasattr(view_process.stderr, 'read') else view_process.stderr}")
-                    return False
+                # 确保所有进程完成
+                view_process.wait()
+                sort_returncode = sort_process.returncode
 
-                if sort_process.returncode != 0:
-                    logger.error(f"BAM排序步骤失败，返回码: {sort_process.returncode}")
+                # 检查错误（注意：view_process可能已完成但communicate()已消费其输出）
+                if sort_returncode != 0:
+                    logger.error(f"BAM排序步骤失败，返回码: {sort_returncode}")
                     if sort_stderr:
                         logger.error(f"错误信息: {sort_stderr.decode()}")
                     return False
