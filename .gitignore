@@ -148,10 +148,24 @@ cython_debug/
 openspec/changes/archive/
 
 # Data files (should not be committed)
-data/
-results/
-logs/
-references/
+data/*
+!data/.gitkeep
+!data/metadata/.gitkeep
+!data/raw_fastq/.gitkeep
+!data/processed/.gitkeep
+results/*
+!results/.gitkeep
+!results/qc/.gitkeep
+!results/alignment/.gitkeep
+!results/counts/.gitkeep
+!results/differential_expression/.gitkeep
+!results/small_rna_motif/.gitkeep
+logs/*
+!logs/.gitkeep
+references/*
+!references/.gitkeep
+!references/hsa.mature.fa
+!references/hg38.fa.fai
 *.fastq
 *.fastq.gz
 *.fq
