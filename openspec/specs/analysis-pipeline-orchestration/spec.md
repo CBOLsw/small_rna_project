@@ -38,7 +38,7 @@ TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update 
 
 #### Scenario: 参数验证
 - **WHEN** 加载配置文件
-- **THEN** 系统验证配置参数的有效性，检查文件路径存在性，参数取值范围合理性
+- **THEN** 系统解析YAML配置文件，检查关键参数是否存在
 
 ### Requirement: 日志记录和错误处理
 系统应记录分析过程日志，提供错误处理和恢复机制。
@@ -49,24 +49,20 @@ TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update 
 
 #### Scenario: 错误处理
 - **WHEN** 分析步骤失败
-- **THEN** 系统捕获错误，记录错误信息，提供恢复建议，支持从失败步骤重新开始
+- **THEN** 系统捕获错误，记录错误信息，支持通过--resume参数从失败步骤重新开始
 
 #### Scenario: 进度跟踪
-- **WHEN** 长时间运行的分析
-- **THEN** 系统提供进度跟踪，显示已完成步骤、进行中步骤、待执行步骤
+- **WHEN** 查询分析进度
+- **THEN** 系统通过--status命令显示各模块完成状态：已完成、执行中、待执行
 
 ### Requirement: 结果整合和报告生成
 系统应整合各模块分析结果，生成综合报告。
 
 #### Scenario: 结果收集
 - **WHEN** 所有分析步骤完成
-- **THEN** 系统收集各模块的输出结果，组织成统一结构
+- **THEN** 系统收集各模块的输出结果，汇总到统一目录结构
 
 #### Scenario: 报告生成
 - **WHEN** 结果收集完成
-- **THEN** 系统生成分析报告，包含数据质控摘要、比对统计、差异表达结果、motif发现结果、可视化图表
-
-#### Scenario: 可重复性文档
-- **WHEN** 分析完成
-- **THEN** 系统生成可重复性文档，记录软件版本、参数设置、执行命令，确保结果可重现
+- **THEN** 系统生成HTML格式分析报告，包含数据质控摘要、比对统计、差异表达结果、motif发现结果概要
 

@@ -224,7 +224,7 @@ def check_pipeline_status(config: Dict[str, Any]) -> None:
             'log_prefix': 'deseq2_analysis'
         },
         'motif_analysis': {
-            'output': os.path.join(results_dir, 'motif_analysis', 'filtered_motifs.csv'),
+            'output': os.path.join(results_dir, 'small_rna_motif', 'meme_results', 'meme_summary.json'),
             'log_prefix': 'meme_'
         },
     }

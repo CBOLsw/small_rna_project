@@ -61,5 +61,5 @@ TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update 
 
 #### Scenario: 结果表格导出
 - **WHEN** 差异分析完成
-- **THEN** 系统导出完整结果表格，包含基因ID、基因名称、基础表达量、log2FC、p-value、adjusted p-value、基因类型等信息
+- **THEN** 系统导出完整结果表格，包含基因ID、基础表达量、log2FC、p-value、adjusted p-value等信息
 

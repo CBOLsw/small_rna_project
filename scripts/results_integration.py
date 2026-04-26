@@ -156,19 +156,9 @@ def collect_expression_results(config: Dict[str, Any]) -> Dict[str, Any]:
 def collect_motif_results(config: Dict[str, Any]) -> Dict[str, Any]:
     """收集motif分析结果"""
     logger = logging.getLogger(__name__)
-    motif_dir = os.path.join(config['directories']['results'], 'motif_analysis')
+    motif_dir = os.path.join(config['directories']['results'], 'small_rna_motif')
 
     results = {}
-
-    # 过滤后的motif
-    filtered_file = os.path.join(motif_dir, 'filtered_motifs.csv')
-    if os.path.exists(filtered_file):
-        try:
-            motifs_df = pd.read_csv(filtered_file)
-            results['filtered_motifs'] = motifs_df
-            logger.info(f"Motif结果已收集: {motifs_df.shape[0]} 个motif")
-        except Exception as e:
-            logger.warning(f"无法读取Motif结果: {e}")
 
     # MEME结果
     meme_dir = os.path.join(motif_dir, 'meme_results')
@@ -180,14 +170,15 @@ def collect_motif_results(config: Dict[str, Any]) -> Dict[str, Any]:
                 with open(summary_file, 'r') as f:
                     meme_summary = json.load(f)
                 results['meme_summary'] = meme_summary
-                logger.info(f"MEME结果已收集: {meme_summary['motifs_found']} 个motif")
+                results['filtered_motifs'] = meme_summary.get('motifs', [])
+                logger.info(f"MEME结果已收集: {meme_summary.get('motifs_found', 0)} 个motif")
             except Exception as e:
                 logger.warning(f"无法读取MEME摘要: {e}")
 
-    # 可视化结果
-    visualization_dir = os.path.join(motif_dir, 'visualization')
-    if os.path.exists(visualization_dir):
-        results['visualization_dir'] = visualization_dir
+    # miRNA reads FASTA
+    mirna_fasta = os.path.join(motif_dir, 'mirna_reads.fasta')
+    if os.path.exists(mirna_fasta):
+        results['mirna_fasta'] = mirna_fasta
 
     return results
 
@@ -474,12 +465,10 @@ def generate_html_report(config: Dict[str, Any],
                 <div class="visualization">
     """
 
-    motif_dir = os.path.join(config['directories']['results'], 'motif_analysis')
-    visualization_dir = os.path.join(motif_dir, 'visualization')
-    if os.path.exists(visualization_dir):
-        for file in Path(visualization_dir).glob('*.png'):
-            if 'overview' in str(file.name) or 'logo' in str(file.name):
-                html += f"<img src='{str(file)}' alt='{file.name}'>"
+    motif_dir = os.path.join(config['directories']['results'], 'small_rna_motif')
+    meme_html = os.path.join(motif_dir, 'meme_results', 'meme.html')
+    if os.path.exists(meme_html):
+        html += f"<p>MEME结果: <a href='{meme_html}' target='_blank'>meme.html</a></p>"
 
     html += """
                 </div>
@@ -503,8 +492,8 @@ def generate_html_report(config: Dict[str, Any],
                         <td>hg38</td>
                     </tr>
                     <tr>
-                        <th>数据库版本</th>
-                        <td>JASPAR 2022</td>
+                        <th>motif发现工具</th>
+                        <td>MEME Suite (de novo)</td>
                     </tr>
                 </table>
             </div>
@@ -572,9 +561,9 @@ def copy_visualization_files(config: Dict[str, Any], report_dir: str) -> None:
                 logger.warning(f"无法复制文件 {file}: {e}")
 
     # 复制motif可视化图表
-    motif_vis_dir = os.path.join(results_dir, 'motif_analysis', 'visualization')
-    if os.path.exists(motif_vis_dir):
-        for file in Path(motif_vis_dir).glob('*.png'):
+    motif_dir = os.path.join(results_dir, 'small_rna_motif', 'meme_results')
+    if os.path.exists(motif_dir):
+        for file in Path(motif_dir).glob('*.html'):
             target_path = os.path.join(visualization_dir, os.path.basename(file))
             if not os.path.exists(target_path):
                 try:

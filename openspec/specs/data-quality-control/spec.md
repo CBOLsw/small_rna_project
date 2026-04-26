@@ -11,8 +11,8 @@ TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update 
 - **THEN** 系统生成FastQC格式的质量报告，包含每个样本的质量分数分布图、每个碱基位置的质量箱线图、序列长度分布图、GC含量分布图、接头污染检测结果
 
 #### Scenario: 数据质量问题识别
-- **WHEN** 分析FastQC报告
-- **THEN** 系统识别潜在数据质量问题，如低质量序列、接头污染、异常GC含量，并生成问题摘要报告
+- **WHEN** 分析样本质控结果
+- **THEN** 系统检测trim保留率低于50%的样本，标记潜在问题样本
 
 ### Requirement: 序列质量修剪和过滤
 系统应对低质量序列进行修剪和过滤，去除接头序列，保留高质量clean reads用于下游分析。
@@ -38,5 +38,5 @@ TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update 
 
 #### Scenario: 质控可视化
 - **WHEN** 质控完成
-- **THEN** 系统生成质控可视化图表，包括所有样本的reads数条形图、质量分数分布热图、长度分布小提琴图
+- **THEN** 系统生成质控可视化图表，包括所有样本的reads保留率条形图、输入vs保留reads散点图、样本状态热图
 

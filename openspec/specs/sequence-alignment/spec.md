@@ -8,7 +8,7 @@ TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update 
 
 #### Scenario: 参考基因组准备
 - **WHEN** 输入参考基因组FASTA文件
-- **THEN** 系统验证文件格式和完整性，检查染色体命名一致性
+- **THEN** 系统检查文件存在性，使用bowtie2-build构建索引
 
 #### Scenario: Bowtie2索引构建
 - **WHEN** 参考基因组准备就绪
@@ -37,8 +37,8 @@ TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update 
 - **THEN** 系统统计每个样本的总reads数、比对reads数、唯一比对reads数、多重比对reads数，计算比对率、唯一比对率
 
 #### Scenario: 唯一比对筛选
-- **WHEN** 存在多重比对reads
-- **THEN** 系统保留比对质量最高的唯一比对，过滤低质量多重比对
+- **WHEN** SAM文件生成
+- **THEN** 系统使用samtools view -F 0x100过滤，保留primary比对reads
 
 #### Scenario: BAM格式转换和排序
 - **WHEN** SAM文件生成
@@ -53,5 +53,5 @@ TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update 
 
 #### Scenario: 基因组覆盖度分析
 - **WHEN** 比对完成
-- **THEN** 系统分析reads在基因组上的覆盖度，生成覆盖深度分布图，识别覆盖偏好性
+- **THEN** 系统分析reads在参考基因组上的覆盖度（注：全基因组覆盖度分析不适用于small RNA靶向测序数据，此步骤默认跳过）
 
