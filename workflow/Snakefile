@@ -312,7 +312,6 @@ rule create_directories:
     output:
         os.path.join(config["directories"]["processed"], ".dir_exists"),
         os.path.join(config["directories"]["results"], ".dir_exists"),
-        os.path.join(config["directories"]["reports"], ".dir_exists"),
         os.path.join(config["directories"]["results"], "qc", ".dir_exists"),
         os.path.join(config["directories"]["results"], "alignment", ".dir_exists"),
         os.path.join(config["directories"]["results"], "counts", ".dir_exists"),
@@ -326,8 +325,7 @@ rule create_directories:
                  {config[directories][results]}/alignment \
                  {config[directories][results]}/counts \
                  {config[directories][results]}/differential_expression \
-                 {config[directories][results]}/small_rna_motif/meme_results \
-                 {config[directories][reports]}
+                 {config[directories][results]}/small_rna_motif/meme_results
         touch {output}
         """
 

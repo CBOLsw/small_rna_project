@@ -51,19 +51,6 @@ def load_config(config_file: str) -> Dict[str, Any]:
         sys.exit(1)
 
 
-def create_report_directory(config: Dict[str, Any]) -> str:
-    """创建报告目录"""
-    logger = logging.getLogger(__name__)
-    report_dir = config['directories']['reports']
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    specific_report_dir = os.path.join(report_dir, f"report_{timestamp}")
-
-    Path(specific_report_dir).mkdir(parents=True, exist_ok=True)
-    logger.info(f"报告目录已创建: {specific_report_dir}")
-
-    return specific_report_dir
-
-
 def collect_qc_results(config: Dict[str, Any]) -> pd.DataFrame:
     """收集质量控制结果"""
     logger = logging.getLogger(__name__)

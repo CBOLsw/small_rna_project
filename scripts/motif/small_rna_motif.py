@@ -342,8 +342,7 @@ def run_meme_on_small_rna(fasta_file: str, output_dir: str,
         motifs = parse_meme_result(output_path / 'meme.txt') if (output_path / 'meme.txt').exists() else []
 
         # 去重（去除正向/反向互补重复的motif）
-        max_motifs_param = int(cmd[cmd.index('-nmotifs') + 1]) if '-nmotifs' in cmd else 10
-        unique_motifs = deduplicate_motifs(motifs, max_motifs=max_motifs_param)
+        unique_motifs = deduplicate_motifs(motifs)
 
         return {
             'success': True,
@@ -406,21 +405,19 @@ def normalize_motif(seq: str) -> str:
     return min(seq.upper(), rc.upper())
 
 
-def deduplicate_motifs(motifs: List[Dict[str, Any]], max_motifs: int = 10) -> List[Dict[str, Any]]:
+def deduplicate_motifs(motifs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    去除重复的motif
+    合并重复的motif
     规则：
     1. 规范化motif序列（正向/反向互补取字典序较小的）
     2. 按E-value排序
-    3. 相同规范化序列只保留一个
-    4. 最多保留max_motifs个
+    3. 相同规范化序列只保留E-value最好的一个
+    4. 不限制数量，保留所有唯一motif
     """
-    seen = set()
-    unique_motifs = []
-
     # 按E-value排序
     sorted_motifs = sorted(motifs, key=lambda x: x.get('evalue', float('inf')))
 
+    seen = {}  # {normalized_seq: best_motif}
     for motif in sorted_motifs:
         # 提取序列（motif id格式：SEQUENCE MEME-N）
         seq = motif.get('id', '').split()[0] if ' ' in motif.get('id', '') else motif.get('id', '')
@@ -429,14 +426,11 @@ def deduplicate_motifs(motifs: List[Dict[str, Any]], max_motifs: int = 10) -> Li
 
         norm_seq = normalize_motif(seq)
         if norm_seq not in seen:
-            seen.add(norm_seq)
             motif['normalized_seq'] = norm_seq
             motif['original_seq'] = seq
-            unique_motifs.append(motif)
+            seen[norm_seq] = motif
 
-            if len(unique_motifs) >= max_motifs:
-                break
-
+    unique_motifs = list(seen.values())
     logger.info(f"Motif去重：原始{len(motifs)}个 → 去重后{len(unique_motifs)}个")
     return unique_motifs
 

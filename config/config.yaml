@@ -18,7 +18,6 @@ directories:
   references: "references"
   results: "results"
   logs: "logs"
-  reports: "reports"
 
 # 参考基因组配置
 # 注意：genome_fasta和gtf_annotation可以是压缩文件(.gz)或解压文件

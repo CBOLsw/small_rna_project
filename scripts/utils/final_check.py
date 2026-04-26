@@ -111,8 +111,8 @@ def check_project_structure():
         "data", "data/raw_fastq", "data/processed", "data/metadata",
         "references", "references/bowtie2_index",
         "results", "results/qc", "results/alignment", "results/counts",
-        "results/differential_expression", "results/motif_analysis",
-        "logs", "reports", "scripts", "scripts/qc", "scripts/alignment",
+        "results/differential_expression", "results/small_rna_motif",
+        "logs", "scripts", "scripts/qc", "scripts/alignment",
         "scripts/expression", "scripts/motif", "scripts/setup", "scripts/utils",
         "workflow", "config", "envs", "openspec", "openspec/specs"
     ]
