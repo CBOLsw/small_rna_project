@@ -165,42 +165,48 @@ hg38.mirbase.gff3
 ### 主要配置项
 
 ```yaml
-# 1. 样本配置
+# 样本配置
 samples:
-  metadata_file: "data/metadata/sample_info.csv"  # 样本信息文件
-  group_column: "group"    # 分组列名
-  sample_column: "sample"  # 样本ID列名
-  groups: [GAO, PAL]      # 分组名称
+  metadata_file: "data/metadata/sample_info.csv"
+  group_column: "group"
+  sample_column: "sample"
+  groups: ["GAO", "PAL"]
 
-# 2. 质量控制
+# 质量控制
 quality_control:
   trimmomatic:
     threads: 4
     minlen: 18            # small RNA 最小长度
-    slidingwindow: "4:15" # 滑动窗口
+    slidingwindow: "4:15"
 
-# 3. 序列比对
+# 序列比对
 alignment:
   bowtie2:
     threads: 8
-    preset: "very-sensitive-local"  # 适合 small RNA
-    k: 10                 # 报告最佳 10 个比对
+    preset: "very-sensitive-local"
+    k: 10
 
-# 4. 差异表达
+# 差异表达
 differential_expression:
   deseq2:
     padj_threshold: 0.05
     log2fc_threshold: 1.0
+    control_group: "GAO"
+    treatment_group: "PAL"
 
-# 5. Small RNA Motif 分析
+# Small RNA Motif 分析
 motif_analysis:
   mirbase:
     min_len: 18
     max_len: 35
+    max_mismatches: 1
   meme:
     min_width: 5
     max_width: 8
     max_motifs: 3
+    evalue_threshold: 1e-4
+    minsites: 10
+    maxsites: 100
     searchsize: 100000
 ```
 

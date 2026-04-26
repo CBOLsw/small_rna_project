@@ -179,34 +179,6 @@ class ReferenceDownloader:
 
         return None
 
-    def download_small_rna_annotation(self) -> Optional[str]:
-        """下载small RNA注释"""
-        # 多个备选URL，按优先级尝试
-        url_candidates = [
-            "https://www.mirbase.org/ftp/CURRENT/genomes/hsa.gff3",
-            "http://www.mirbase.org/ftp/CURRENT/genomes/hsa.gff3",
-            "ftp://mirbase.org/pub/mirbase/CURRENT/genomes/hsa.gff3",
-        ]
-
-        dest_path = self.ref_dir / "hg38.mirbase.gff3"
-
-        # 如果文件已存在，直接返回
-        if dest_path.exists():
-            logger.info("  [OK] miRBase small RNA注释已存在")
-            return str(dest_path)
-
-        # 尝试每个URL
-        for i, url in enumerate(url_candidates):
-            logger.info(f"  尝试下载miRBase注释 (源{i+1}/{len(url_candidates)})")
-            result = self.download_file(url, dest_path, "miRBase small RNA注释")
-            if result is not None:
-                logger.info("  [OK] 成功下载miRBase注释")
-                return result
-
-        # 所有URL都失败
-        logger.warning("  [WARNING] 所有miRBase下载源都失败，small RNA注释将不可用")
-        return None
-
     def prepare_index_directory(self) -> Path:
         """准备Bowtie2索引目录"""
         index_dir = self.ref_dir / "bowtie2_index"
@@ -228,11 +200,6 @@ class ReferenceDownloader:
         gtf_file = self.download_hg38_gtf()
         if gtf_file:
             results['gtf'] = gtf_file
-
-        # 下载small RNA注释
-        mirna_file = self.download_small_rna_annotation()
-        if mirna_file:
-            results['mirna'] = mirna_file
 
         # 准备索引目录
         index_dir = self.prepare_index_directory()
