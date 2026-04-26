@@ -1053,6 +1053,71 @@ def run_meme_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def fix_meme_xml_ids(meme_xml_file: Path, output_file: Path = None) -> str:
+    """修复MEME XML中的motif ID，确保每个motif有唯一ID"""
+    if not meme_xml_file.exists():
+        return str(meme_xml_file)
+
+    with open(meme_xml_file, 'r') as f:
+        content = f.read()
+
+    # 提取每个motif的完整XML块
+    import re
+    motif_blocks = []
+    motif_pattern = re.compile(
+        r'(<motif\s+id="motif_\d+"\s+name="([^"]+)"\s+alt="([^"]+)"[^>]*>.*?</motif>)',
+        re.DOTALL
+    )
+
+    for match in motif_pattern.finditer(content):
+        full_block = match.group(1)
+        motif_name = match.group(2)  # 序列
+        motif_alt = match.group(3)    # 如 MEME-1
+        motif_blocks.append((full_block, motif_name, motif_alt))
+
+    # 去重：相同序列的motif只保留一个
+    seen_sequences = {}
+    unique_motifs = []
+    for full_block, motif_name, motif_alt in motif_blocks:
+        norm_seq = normalize_motif(motif_name)
+        if norm_seq not in seen_sequences:
+            seen_sequences[norm_seq] = len(unique_motifs) + 1
+            unique_motifs.append((full_block, motif_name, motif_alt))
+
+    logger.info(f"MEME XML去重：原始{len(motif_blocks)}个motifs → 去重后{len(unique_motifs)}个")
+
+    # 生成新的XML：为每个motif分配唯一的ID
+    header_end = content.find('<motifs>')
+    if header_end == -1:
+        logger.warning("无法找到<motifs>标签")
+        return str(meme_xml_file)
+
+    header = content[:header_end]
+
+    new_motifs = ['<motifs>']
+    for i, (full_block, motif_name, motif_alt) in enumerate(unique_motifs, 1):
+        # 生成唯一的ID：motif_1, motif_2, ...
+        # 替换原来的motif ID
+        new_block = re.sub(r'id="motif_\d+"', f'id="motif_{i}"', full_block)
+        # 同时更新alt以保持一致
+        new_block = re.sub(r'alt="[^"]+"', f'alt="motif_{i}"', new_block)
+        new_motifs.append(new_block)
+    new_motifs.append('</motifs>')
+
+    # 合成完整XML
+    new_content = header + '\n'.join(new_motifs)
+
+    # 决定输出文件
+    if output_file is None:
+        output_file = meme_xml_file.with_suffix('.fixed.xml')
+
+    with open(output_file, 'w') as f:
+        f.write(new_content)
+
+    logger.info(f"已生成唯一ID的meme.xml: {output_file}")
+    return str(output_file)
+
+
 def run_tomtom_only(config: Dict[str, Any]) -> Dict[str, Any]:
     """仅运行TomTom比对步骤"""
     motif_cfg = config.get('motif_analysis', {})
@@ -1073,13 +1138,17 @@ def run_tomtom_only(config: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"meme.xml不存在，请先运行MEME分析步骤")
         return {'success': False, 'error': 'meme.xml不存在'}
 
+    # 修复MEME XML中的motif ID（确保唯一）
+    fixed_xml_file = meme_xml_file.with_suffix('.fixed.xml')
+    fixed_meme_file = fix_meme_xml_ids(meme_xml_file, fixed_xml_file)
+
     # 创建TomTom输出目录
     tomtom_results_dir = motif_results_dir / 'tomtom_results'
     tomtom_results_dir.mkdir(parents=True, exist_ok=True)
 
     # 运行TomTom
     tomtom_result = run_tomtom_analysis(
-        motif_file=str(meme_xml_file),
+        motif_file=fixed_meme_file,
         output_dir=str(tomtom_results_dir),
         database=tomtom_cfg.get('database', None),
         evalue_threshold=tomtom_cfg.get('evalue_threshold', 0.05),
