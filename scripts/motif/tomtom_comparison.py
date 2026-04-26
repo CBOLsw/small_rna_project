@@ -45,6 +45,68 @@ def check_tomtom_installed(tomtom_path: str = "tomtom") -> bool:
         return False
 
 
+def ensure_motif_database(database: Optional[str]) -> Optional[str]:
+    """
+    确保motif数据库可用，必要时自动下载JASPAR
+    """
+    if database and Path(database).exists():
+        return database
+
+    # 检查项目本地路径
+    local_db = Path("references/motif_databases/JASPAR/JASPAR2024_CORE_vertebrates_non-redundant.meme")
+    if local_db.exists():
+        logger.info(f"使用本地数据库: {local_db}")
+        return str(local_db)
+
+    old_db = Path("references/motif_databases/JASPAR/JASPAR2022_CORE_vertebrates_non-redundant.meme")
+    if old_db.exists():
+        logger.info(f"使用本地数据库: {old_db}")
+        return str(old_db)
+
+    # 检查MEME默认安装路径
+    for prefix in ["/usr/local", "/usr", os.path.expanduser("~/miniconda3/envs/small_rna_analysis")]:
+        for db_path in [
+            f"{prefix}/share/meme/db/motif_databases/JASPAR/JASPAR2024_CORE_vertebrates_non-redundant.meme",
+            f"{prefix}/share/meme/db/motif_databases/JASPAR/JASPAR2022_CORE_vertebrates_non-redundant.meme",
+        ]:
+            if Path(db_path).exists():
+                logger.info(f"使用系统数据库: {db_path}")
+                return db_path
+
+    # 自动下载JASPAR数据库
+    logger.info("未找到JASPAR数据库，开始自动下载...")
+    db_dir = Path("references/motif_databases/JASPAR")
+    db_dir.mkdir(parents=True, exist_ok=True)
+
+    import urllib.request
+    import tarfile
+
+    url = "https://meme-suite.org/meme/meme-software/Databases/motifs/motif_databases.12.25.tgz"
+    tgz_path = Path("references/motif_databases/motif_databases.tgz")
+
+    try:
+        logger.info(f"下载motif数据库: {url}")
+        urllib.request.urlretrieve(url, tgz_path)
+        logger.info("下载完成，解压中...")
+
+        with tarfile.open(tgz_path, "r:gz") as tar:
+            tar.extractall(path="references/motif_databases/")
+        tgz_path.unlink()
+
+        # 查找JASPAR文件
+        for p in db_dir.parent.rglob("JASPAR*_CORE_vertebrates_non-redundant.meme"):
+            logger.info(f"数据库就绪: {p}")
+            return str(p)
+
+        logger.error("下载完成但未找到JASPAR数据库文件")
+    except Exception as e:
+        logger.error(f"下载数据库失败: {e}")
+        if tgz_path.exists():
+            tgz_path.unlink()
+
+    return database
+
+
 def run_tomtom_comparison(motif_file: str, output_dir: str,
                          database: str = None,
                          evalue_threshold: float = 0.05,
@@ -76,24 +138,11 @@ def run_tomtom_comparison(motif_file: str, output_dir: str,
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # 默认数据库（如果未指定）
+    # 确保数据库可用（本地查找或自动下载）
+    database = ensure_motif_database(database)
     if database is None:
-        # 检查常见数据库路径
-        default_dbs = [
-            '/usr/local/share/meme/db/motif_databases/JASPAR/JASPAR2022_CORE_vertebrates_non-redundant.meme',
-            '/opt/meme/db/motif_databases/JASPAR/JASPAR2022_CORE_vertebrates_non-redundant.meme',
-            '/usr/share/meme/db/motif_databases/JASPAR/JASPAR2022_CORE_vertebrates_non-redundant.meme',
-            './databases/JASPAR_CORE_vertebrates.meme'
-        ]
-
-        for db_path in default_dbs:
-            if Path(db_path).exists():
-                database = db_path
-                break
-
-        if database is None:
-            logger.warning("未找到默认数据库，尝试在线数据库")
-            database = 'JASPAR_vertebrates'
+        logger.error("未找到motif数据库且自动下载失败")
+        return {'success': False, 'error': 'motif数据库未找到'}
 
     logger.info(f"开始TomTom motif比较分析")
     logger.info(f"输入motif文件: {motif_file}")

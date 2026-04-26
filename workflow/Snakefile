@@ -278,7 +278,9 @@ rule deseq2_analysis:
             --metadata {input.metadata} \
             --output {config[directories][results]}/differential_expression \
             --padj-threshold {config[differential_expression][deseq2][padj_threshold]} \
-            --fc-threshold {config[differential_expression][deseq2][log2fc_threshold]} \
+            --lfc-threshold {config[differential_expression][deseq2][log2fc_threshold]} \
+            --control-group {config[differential_expression][deseq2][control_group]} \
+            --treatment-group {config[differential_expression][deseq2][treatment_group]} \
             2>&1 | tee {log}
         """
 
@@ -323,6 +325,9 @@ rule run_meme:
             --width '{config[motif_analysis][meme][min_width]},{config[motif_analysis][meme][max_width]}' \
             --nmotifs {config[motif_analysis][meme][max_motifs]} \
             --evalth {config[motif_analysis][meme][evalue_threshold]} \
+            --minsites {config[motif_analysis][meme][minsites]} \
+            --maxsites {config[motif_analysis][meme][maxsites]} \
+            --searchsize {config[motif_analysis][meme][searchsize]} \
             --threads {threads} \
             2>&1 | tee {log}
         """

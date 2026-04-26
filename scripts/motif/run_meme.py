@@ -19,6 +19,7 @@ import argparse
 import subprocess
 import logging
 import json
+import time
 import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Optional, Any
@@ -46,8 +47,12 @@ def check_meme_installed(meme_path: str = "meme") -> bool:
 
 
 def run_meme_analysis(fasta_file: str, output_dir: str,
-                     width_min: int = 6, width_max: int = 12,
-                     max_motifs: int = 10, evalue_threshold: float = 1e-4) -> Dict[str, Any]:
+                     width_min: int = 6, width_max: int = 10,
+                     max_motifs: int = 3, evalue_threshold: float = 1e-4,
+                     num_threads: int = 1,
+                     min_sites: int = 10, max_sites: int = 50,
+                     max_retries: int = 3,
+                     searchsize: int = 1000000) -> Dict[str, Any]:
     """
     运行MEME motif分析
 
@@ -58,6 +63,10 @@ def run_meme_analysis(fasta_file: str, output_dir: str,
         width_max: motif最大宽度
         max_motifs: 最大motif数
         evalue_threshold: E-value阈值
+        min_sites: 每个motif最少位点数
+        max_sites: 每个motif最多位点数
+        max_retries: 失败重试次数
+        searchsize: MEME -searchsize参数（最长序列长度限制）
 
     返回:
         Dict: 分析结果
@@ -80,76 +89,111 @@ def run_meme_analysis(fasta_file: str, output_dir: str,
     logger.info(f"motif宽度: {width_min}-{width_max} nt")
     logger.info(f"最大motif数: {max_motifs}")
     logger.info(f"E-value阈值: {evalue_threshold}")
+    logger.info(f"motif位点数: {min_sites}-{max_sites}")
 
-    try:
-        # 构建MEME命令（针对small RNA优化）
-        cmd = [
-            'meme',
-            fasta_file,
-            '-o', str(output_path),
-            '-dna',              # DNA序列
-            '-mod', 'zoops',     # 零或一次出现模型（适合motif发现）
-            '-nmotifs', str(max_motifs),
-            '-minw', str(width_min),
-            '-maxw', str(width_max),
-            '-minsites', '5',    # 每个motif最少位点数
-            '-maxsites', '100',  # 每个motif最多位点数
-            '-evt', str(evalue_threshold),
-            '-revcomp',          # 考虑反向互补链
-        ]
+    if num_threads > 1:
+        logger.warning(f"conda版MEME不支持并行(-p)，忽略 --threads {num_threads}")
 
-        logger.info(f"运行MEME命令: {' '.join(cmd)}")
+    # 构建MEME命令（针对small RNA优化）
+    cmd = [
+        'meme',
+        fasta_file,
+        '-oc', str(output_path),   # -oc 允许覆盖已有目录
+        '-dna',                    # DNA序列
+        '-mod', 'oops',            # 一次出现模型（每条短序列至多一个motif，适合small RNA）
+        '-nmotifs', str(max_motifs),
+        '-minw', str(width_min),
+        '-maxw', str(width_max),
+        '-minsites', str(min_sites),
+        '-maxsites', str(max_sites),
+        '-evt', str(evalue_threshold),
+        '-searchsize', str(searchsize),
+        '-revcomp',                # 考虑反向互补链
+    ]
 
-        # 执行MEME命令
-        process = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+    logger.info(f"运行MEME命令: {' '.join(cmd)}")
 
-        logger.info("MEME分析完成")
+    # 带重试的执行
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            process = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            break  # 成功则退出重试循环
+        except subprocess.CalledProcessError as e:
+            last_error = e
+            stderr_snippet = e.stderr[:300] if e.stderr else ''
+            logger.warning(f"MEME执行失败 (尝试 {attempt}/{max_retries}): {stderr_snippet}")
 
-        # 检查输出文件
-        result_files = {}
-        expected_files = ['meme.html', 'meme.xml', 'meme.txt']
+            # 永久性错误不重试（序列太长、参数错误等）
+            permanent_errors = [
+                "must not contain sequences longer",
+                "unrecognized option",
+                "Cannot open file",
+                "Unknown parameter",
+            ]
+            stderr_lower = (e.stderr or '').lower()
+            if any(err.lower() in stderr_lower for err in permanent_errors):
+                logger.error(f"永久性错误，停止重试: {stderr_snippet}")
+                return {'success': False, 'error': f'MEME执行失败（永久性错误）: {stderr_snippet}'}
 
-        for file_name in expected_files:
-            file_path = output_path / file_name
-            if file_path.exists():
-                result_files[file_name] = str(file_path)
-
-        # 解析主要结果
-        txt_file = output_path / 'meme.txt'
-        motifs = parse_meme_text_result(txt_file) if txt_file.exists() else []
-
-        result = {
-            'success': True,
-            'output_dir': str(output_path),
-            'files': result_files,
-            'motifs_found': len(motifs),
-            'motifs': motifs,
-            'parameters': {
-                'width_min': width_min,
-                'width_max': width_max,
-                'max_motifs': max_motifs,
-                'evalue_threshold': evalue_threshold
-            }
+            if attempt < max_retries:
+                wait = min(2 ** attempt * 10, 120)  # 指数退避：20s, 40s, 80s...
+                logger.info(f"等待 {wait}s 后重试...")
+                time.sleep(wait)
+        except Exception as e:
+            last_error = e
+            logger.error(f"运行MEME时发生意外错误: {e}")
+            return {'success': False, 'error': str(e)}
+    else:
+        # 所有重试均失败
+        logger.error(f"MEME执行失败（已重试 {max_retries} 次）")
+        return {
+            'success': False,
+            'error': f'MEME执行失败（重试{max_retries}次）: {str(last_error)[:200]}'
         }
 
-        # 保存结果摘要
-        save_result_summary(result, output_path)
+    logger.info("MEME分析完成")
 
-        logger.info(f"发现 {len(motifs)} 个显著motif")
-        return result
+    # 检查输出文件
+    result_files = {}
+    expected_files = ['meme.html', 'meme.xml', 'meme.txt']
 
-    except subprocess.CalledProcessError as e:
-        logger.error(f"MEME执行失败: {e}")
-        logger.error(f"STDERR: {e.stderr[:500]}")
-        return {'success': False, 'error': f'MEME执行失败: {e.stderr[:200]}'}
-    except Exception as e:
-        logger.error(f"运行MEME时出错: {e}")
-        return {'success': False, 'error': str(e)}
+    for file_name in expected_files:
+        file_path = output_path / file_name
+        if file_path.exists():
+            result_files[file_name] = str(file_path)
+
+    # 解析主要结果
+    txt_file = output_path / 'meme.txt'
+    motifs = parse_meme_text_result(txt_file) if txt_file.exists() else []
+
+    result = {
+        'success': True,
+        'output_dir': str(output_path),
+        'files': result_files,
+        'motifs_found': len(motifs),
+        'motifs': motifs,
+        'parameters': {
+            'width_min': width_min,
+            'width_max': width_max,
+            'max_motifs': max_motifs,
+            'evalue_threshold': evalue_threshold,
+            'min_sites': min_sites,
+            'max_sites': max_sites,
+            'searchsize': searchsize
+        }
+    }
+
+    # 保存结果摘要
+    save_result_summary(result, output_path)
+
+    logger.info(f"发现 {len(motifs)} 个显著motif")
+    return result
 
 
 def parse_meme_text_result(txt_file: Path) -> List[Dict[str, Any]]:
@@ -262,17 +306,21 @@ def main():
                        help='输出目录（将在此目录下创建MEME结果）')
 
     # 可选参数
-    parser.add_argument('--width', type=str, default='6,12',
-                       help='motif宽度范围，格式: min,max（默认: 6,12）')
-    parser.add_argument('--nmotifs', type=int, default=10,
-                       help='最大motif数（默认: 10）')
+    parser.add_argument('--width', type=str, default='6,10',
+                       help='motif宽度范围，格式: min,max（默认: 6,10）')
+    parser.add_argument('--nmotifs', type=int, default=3,
+                       help='最大motif数（默认: 3）')
     parser.add_argument('--evalth', type=float, default=1e-4,
                        help='E-value阈值（默认: 1e-4）')
 
-    parser.add_argument('--minsites', type=int, default=5,
-                       help='每个motif最少位点数（默认: 5）')
-    parser.add_argument('--maxsites', type=int, default=100,
-                       help='每个motif最多位点数（默认: 100）')
+    parser.add_argument('--minsites', type=int, default=10,
+                       help='每个motif最少位点数（默认: 10）')
+    parser.add_argument('--maxsites', type=int, default=50,
+                       help='每个motif最多位点数（默认: 50）')
+    parser.add_argument('--threads', type=int, default=1,
+                       help='并行线程数（默认: 1）')
+    parser.add_argument('--searchsize', type=int, default=1000000,
+                       help='MEME序列搜索长度限制（默认: 1000000）')
 
     args = parser.parse_args()
 
@@ -296,7 +344,11 @@ def main():
         width_min=width_min,
         width_max=width_max,
         max_motifs=args.nmotifs,
-        evalue_threshold=args.evalth
+        evalue_threshold=args.evalth,
+        num_threads=args.threads,
+        min_sites=args.minsites,
+        max_sites=args.maxsites,
+        searchsize=args.searchsize
     )
 
     # 输出结果

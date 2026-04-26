@@ -512,10 +512,10 @@ class ExpressionMatrixGenerator:
                 self.save_matrix(normalized_matrix, actual_output_dir, "normalized_counts")
 
             # 5. 生成报告
-                logger.info("步骤5: 生成分析报告")
-                self.generate_report(count_matrix, normalized_matrix, actual_output_dir)
+            logger.info("步骤5: 生成分析报告")
+            self.generate_report(count_matrix, normalized_matrix, actual_output_dir)
 
-                logger.info("表达矩阵分析完成")
+            logger.info("表达矩阵分析完成")
 
 
 def parse_arguments():

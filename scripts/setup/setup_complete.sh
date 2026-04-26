@@ -41,21 +41,20 @@ print_error() {
     echo "  [$(get_timestamp)] ✗ 错误: $1"
 }
 
-print_progress() {
-    local current=$1
-    local total=$2
-    local message=$3
-    local percent=$((current * 100 / total))
-    echo "  [$(get_timestamp)] [$current/$total] $message ($percent%)"
-}
-
 print_header "Small RNA项目环境安装脚本"
 
-# 获取项目目录（脚本在scripts/setup/，需要向上两级）
+# 获取项目目录
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
 cd "$PROJECT_DIR"
 print_info "项目目录: $PROJECT_DIR"
+
+# 确保使用Linux版conda
+if [ -f "$HOME/miniconda3/bin/conda" ]; then
+    export PATH="$HOME/miniconda3/bin:$PATH"
+elif [ -f "$HOME/miniconda/bin/conda" ]; then
+    export PATH="$HOME/miniconda/bin:$PATH"
+fi
 
 # 1. 检测系统
 print_step "1" "检测系统信息"
@@ -70,7 +69,8 @@ fi
 print_step "2" "检查Miniconda"
 if [ -f "$HOME/miniconda3/bin/conda" ]; then
     print_success "Miniconda已安装"
-    export PATH="$HOME/miniconda3/bin:$PATH"
+elif [ -f "$HOME/miniconda/bin/conda" ]; then
+    print_success "Miniconda已安装"
 else
     print_warning "Miniconda未找到，正在下载安装..."
     if command -v wget &> /dev/null; then
@@ -112,27 +112,34 @@ print_success "Conda镜像源配置完成"
 print_step "4" "配置R镜像源"
 mkdir -p ~/.R
 cat > ~/.Rprofile << 'EOFR'
-# 使用清华CRAN镜像和Bioconductor镜像
 options(repos = c(CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
-options(BioC_mirror = "https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
-message("已配置使用镜像源:")
-message("  - CRAN: https://mirrors.tuna.tsinghua.edu.cn/CRAN/")
-message("  - Bioconductor: https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
+options(BioC_mirror = "https://bioconductor.org")
 EOFR
 print_success "R镜像源配置完成"
 
 # 5. 删除旧环境
-print_step "5" "清理旧环境"
+print_step "5" "清理旧环境和缓存"
 if conda env list | grep -q "small_rna_analysis"; then
-    print_info "正在删除旧环境..."
-    conda env remove -n small_rna_analysis -y > /dev/null 2>&1
-    print_success "旧环境已删除"
-else
-    print_info "无旧环境需要清理"
+    print_info "删除旧conda环境..."
+    conda env remove -n small_rna_analysis -y 2>/dev/null || true
 fi
 
+# 清理残留目录
+CONDA_ENV_PATH="$HOME/miniconda3/envs/small_rna_analysis"
+if [ -d "$CONDA_ENV_PATH" ]; then
+    print_info "清理残留环境目录..."
+    rm -rf "$CONDA_ENV_PATH"
+fi
+CONDA_ENV_PATH2="$HOME/miniconda/envs/small_rna_analysis"
+if [ -d "$CONDA_ENV_PATH2" ]; then
+    print_info "清理残留环境目录..."
+    rm -rf "$CONDA_ENV_PATH2"
+fi
+
+print_success "旧环境和缓存清理完成"
+
 # 6. 创建新环境
-print_step "6" "创建Conda环境"
+print_step "6" "创建Conda环境（含DESeq2, apeglm等所有依赖）"
 print_info "这可能需要15-25分钟，请耐心等待..."
 conda env create -f envs/small_rna_analysis.yaml
 
@@ -146,43 +153,10 @@ if [ $? -eq 0 ]; then
     print_info "配置环境内的R镜像..."
     R_PROFILE_PATH="$CONDA_PREFIX/.Rprofile"
     cat > "$R_PROFILE_PATH" << 'EOFR'
-# R镜像源配置
 options(repos = c(CRAN = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"))
-options(BioC_mirror = "https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
-message("R镜像配置完成:")
-message("  - CRAN: https://mirrors.tuna.tsinghua.edu.cn/CRAN/")
-message("  - Bioconductor: https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
+options(BioC_mirror = "https://bioconductor.org")
 EOFR
-
-    # 验证Bioconductor包安装
-    print_step "7" "验证Bioconductor包安装"
-    print_info "检查DESeq2是否已安装..."
-    R -e 'if (!requireNamespace("DESeq2", quietly = TRUE)) { print("DESeq2 not found, attempting to install..."); if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager"); BiocManager::install("DESeq2", ask=FALSE) } else { print("DESeq2 is already installed") }' 2>&1
-
-    print_info "检查其他Bioconductor包..."
-    R -e '
-        required_packages <- c("GenomicRanges", "IRanges", "SummarizedExperiment")
-        for (pkg in required_packages) {
-            if (!requireNamespace(pkg, quietly = TRUE)) {
-                cat(sprintf("Installing %s...\n", pkg))
-                BiocManager::install(pkg, ask = FALSE)
-            } else {
-                cat(sprintf("%s is already installed\n", pkg))
-            }
-        }
-    ' 2>&1
-
-    print_info "检查optparse包..."
-    R -e '
-        if (!requireNamespace("optparse", quietly = TRUE)) {
-            cat("Installing optparse...\n")
-            install.packages("optparse", repos = "https://mirrors.tuna.tsinghua.edu.cn/CRAN/")
-        } else {
-            cat("optparse is already installed\n")
-        }
-    ' 2>&1
-
-    print_success "Bioconductor包验证完成"
+    print_success "R镜像配置完成"
 else
     print_error "Conda环境创建失败"
     print_info "可能的原因："
@@ -191,8 +165,8 @@ else
     exit 1
 fi
 
-# 7. 检查apt-get包
-print_step "8" "安装系统依赖（可选）"
+# 7. 安装系统依赖
+print_step "7" "安装系统依赖（可选）"
 if command -v apt-get &> /dev/null; then
     print_info "检测到Debian/Ubuntu系统，正在安装工具..."
     sudo apt-get update -qq && sudo apt-get install -qq -y fastqc samtools bowtie2 trimmomatic > /dev/null 2>&1
@@ -202,7 +176,7 @@ else
 fi
 
 # 8. 检查项目文件
-print_step "9" "检查项目文件"
+print_step "8" "检查项目文件"
 if [ -f "references/hg38.fa" ] || [ -f "references/hg38.fa.gz" ]; then
     print_success "参考基因组已存在"
 else
@@ -223,8 +197,8 @@ else
     print_warning "样本信息未找到"
 fi
 
-# 9. 清理
-print_step "10" "清理临时文件"
+# 9. 清理临时文件
+print_step "9" "清理临时文件"
 rm -rf /tmp/bioc_packages
 print_success "临时文件已清理"
 

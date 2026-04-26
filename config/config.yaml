@@ -73,14 +73,19 @@ differential_expression:
     padj_threshold: 0.05
     log2fc_threshold: 1.0
     shrinkage: true
+    control_group: "GAO"
+    treatment_group: "PAL"
 
 # motif分析参数
 motif_analysis:
   meme:
     min_width: 6
-    max_width: 12
-    max_motifs: 10
+    max_width: 10
+    max_motifs: 3
     evalue_threshold: 1e-4
+    minsites: 10
+    maxsites: 50
+    searchsize: 1000000
     threads: 8
   tomtom:
     database: "JASPAR_vertebrates"

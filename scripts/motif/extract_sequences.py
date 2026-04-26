@@ -38,10 +38,12 @@ try:
     HAS_BIOPYTHON = True
 except ImportError:
     HAS_BIOPYTHON = False
-    logger.warning("BioPython未安装，部分功能可能受限")
 
 # 配置日志
 logger = get_script_logger('extract_sequences')
+
+if not HAS_BIOPYTHON:
+    logger.warning("BioPython未安装，部分功能可能受限")
 
 
 class SequenceExtractor:
@@ -124,10 +126,9 @@ class SequenceExtractor:
                                 gene_list: List[str]) -> Dict[str, Dict[str, Any]]:
         """解析基因注释文件，获取基因坐标"""
         gene_coords = {}
+        gene_set = set(gene_list)
 
         try:
-            # 尝试读取GTF/GFF文件
-            # 这里实现一个简化版本，实际应用中可能需要更复杂的解析
             with open(annotation_file, 'r') as f:
                 for line in f:
                     if line.startswith('#'):
@@ -137,50 +138,48 @@ class SequenceExtractor:
                     if len(parts) < 9:
                         continue
 
-                    # GTF格式: chr, source, feature, start, end, score, strand, frame, attributes
                     feature_type = parts[2]
                     if feature_type not in ['gene', 'transcript', 'exon']:
                         continue
 
-                    # 解析属性字段
-                    attributes = {}
+                    # 更健壮的GTF属性解析
+                    gene_id = None
                     for attr in parts[8].split(';'):
                         attr = attr.strip()
-                        if ' ' in attr:
-                            key, value = attr.split(' ', 1)
-                            attributes[key] = value.strip('"')
+                        if not attr:
+                            continue
+                        if attr.startswith('gene_id '):
+                            gene_id = attr.split(' ', 1)[1].strip('";')
+                            break
 
-                    gene_id = attributes.get('gene_id') or attributes.get('gene_name') or attributes.get('GeneID')
-
-                    if gene_id and gene_id in gene_list:
+                    if gene_id and gene_id in gene_set and gene_id not in gene_coords:
                         chrom = parts[0]
                         start = int(parts[3])
                         end = int(parts[4])
                         strand = parts[6]
 
-                        if gene_id not in gene_coords:
-                            gene_coords[gene_id] = {
-                                'chrom': chrom,
-                                'start': start,
-                                'end': end,
-                                'strand': strand,
-                                'attributes': attributes
-                            }
+                        gene_coords[gene_id] = {
+                            'chrom': chrom,
+                            'start': start,
+                            'end': end,
+                            'strand': strand,
+                            'attributes': {'gene_id': gene_id}
+                        }
 
             logger.info(f"解析到 {len(gene_coords)} 个基因的坐标")
 
         except Exception as e:
             logger.warning(f"解析注释文件时出错: {e}")
-
-            # 如果解析失败，使用简单方法
+            # 只对未找到的基因使用默认坐标
             for gene_id in gene_list:
-                gene_coords[gene_id] = {
-                    'chrom': 'chr1',  # 默认值
-                    'start': 1,
-                    'end': 1000,
-                    'strand': '+',
-                    'attributes': {'gene_id': gene_id}
-                }
+                if gene_id not in gene_coords:
+                    gene_coords[gene_id] = {
+                        'chrom': 'chr1',
+                        'start': 1,
+                        'end': 1000,
+                        'strand': '+',
+                        'attributes': {'gene_id': gene_id}
+                    }
 
         return gene_coords
 
@@ -238,19 +237,11 @@ class SequenceExtractor:
         sequences = {}
 
         try:
-            # 确保基因组文件是解压状态（samtools faidx可能不支持压缩格式）
-            logger.info(f"检查参考基因组文件是否是压缩格式: {genome_file}")
-            uncompressed_genome, decompress_success = ensure_uncompressed(genome_file)
-            if not decompress_success:
-                logger.error(f"无法处理压缩文件: {genome_file}")
-                return {}
-            logger.info(f"使用文件: {uncompressed_genome}")
-
             # 检查基因组索引是否存在
-            index_file = Path(f"{uncompressed_genome}.fai")
+            index_file = Path(f"{genome_file}.fai")
             if not index_file.exists():
                 logger.info("创建基因组索引...")
-                subprocess.run(['samtools', 'faidx', uncompressed_genome], check=True)
+                subprocess.run(['samtools', 'faidx', genome_file], check=True)
 
             # 为每个基因提取序列
             for gene_id, coords in gene_coords.items():
@@ -258,14 +249,25 @@ class SequenceExtractor:
                 start = coords['start']
                 end = coords['end']
 
-                # 调整坐标（添加侧翼序列）
-                flanking = config.get('flanking', 0)
-                start_adj = max(1, start - flanking)
-                end_adj = end + flanking
+                # promoter模式：只取TSS上下游区域
+                if config.get('promoter', False):
+                    upstream = config.get('promoter_upstream', 1000)
+                    downstream = config.get('promoter_downstream', 100)
+                    strand = coords['strand']
+                    if strand == '+':
+                        tss = start
+                        start_adj = max(1, tss - upstream)
+                        end_adj = tss + downstream
+                    else:
+                        tss = end
+                        start_adj = max(1, tss - downstream)
+                        end_adj = tss + upstream
+                else:
+                    flanking = config.get('flanking', 0)
+                    start_adj = max(1, start - flanking)
+                    end_adj = end + flanking
 
-                # 构建samtools命令
                 region = f"{chrom}:{start_adj}-{end_adj}"
-
                 cmd = ['samtools', 'faidx', genome_file, region]
 
                 result = subprocess.run(
@@ -324,9 +326,21 @@ class SequenceExtractor:
                     continue
 
                 # 调整坐标
-                flanking = config.get('flanking', 0)
-                start_adj = max(1, start - flanking)
-                end_adj = end + flanking
+                if config.get('promoter', False):
+                    upstream = config.get('promoter_upstream', 1000)
+                    downstream = config.get('promoter_downstream', 100)
+                    if strand == '+':
+                        tss = start
+                        start_adj = max(1, tss - upstream)
+                        end_adj = tss + downstream
+                    else:
+                        tss = end
+                        start_adj = max(1, tss - downstream)
+                        end_adj = tss + upstream
+                else:
+                    flanking = config.get('flanking', 0)
+                    start_adj = max(1, start - flanking)
+                    end_adj = end + flanking
 
                 # 提取序列
                 if end_adj > len(genome[chrom]):
@@ -392,7 +406,7 @@ class SequenceExtractor:
         # 1. 保存统计信息
         stats_file = output_path / "extraction_statistics.json"
         with open(stats_file, 'w') as f:
-            json.dump(result, f, indent=2)
+            json.dump(result, f, indent=2, default=str)
 
         # 2. 保存基因坐标表
         coords_df = pd.DataFrame.from_dict(gene_coords, orient='index')
@@ -408,7 +422,7 @@ class SequenceExtractor:
             f.write("1. 提取概览\n")
             f.write(f"   请求基因数: {result['input_genes']}\n")
             f.write(f"   提取序列数: {result['extracted_sequences']}\n")
-            f.write(f"   提取成功率: {result['extraction_rate']*100:.1f}%\n\n")
+            f.write(f"   提取成功率: {result['stats']['extraction_rate']*100:.1f}%\n\n")
 
             f.write("2. 序列长度统计\n")
             if 'mean_sequence_length' in result['stats']:
@@ -418,7 +432,7 @@ class SequenceExtractor:
                 f.write(f"   最大长度: {result['stats']['max_sequence_length']} bp\n\n")
 
             f.write("3. 未提取基因\n")
-            missing_genes = set(gene_list) - set(sequences.keys())
+            missing_genes = set(gene_coords.keys()) - set(sequences.keys())
             f.write(f"   未提取基因数: {len(missing_genes)}\n")
             if missing_genes:
                 f.write("   基因列表:\n")
@@ -446,6 +460,12 @@ class SequenceExtractor:
         if not gene_list:
             logger.error("无有效基因列表")
             return False
+
+        # 限制基因数量（默认全部，可通过 --top-n 限制）
+        top_n = config.get('top_n', 0)
+        if top_n > 0 and len(gene_list) > top_n:
+            logger.info(f"基因列表共 {len(gene_list)} 个，取前 {top_n} 个")
+            gene_list = gene_list[:top_n]
 
         # 2. 提取序列
         result = self.extract_gene_sequences(
@@ -511,3 +531,55 @@ class SequenceExtractor:
         return []
 
 
+def main():
+    """命令行入口"""
+    parser = argparse.ArgumentParser(description="提取差异表达基因的序列")
+    parser.add_argument("--genes", required=True, help="差异表达基因CSV文件")
+    parser.add_argument("--genome", required=True, help="参考基因组FASTA文件")
+    parser.add_argument("--annotation", required=True, help="基因注释GTF文件")
+    parser.add_argument("--output", required=True, help="输出FASTA文件路径")
+    parser.add_argument("--flanking", type=int, default=0, help="侧翼序列长度")
+    parser.add_argument("--full-gene", action="store_true", help="提取完整基因序列（默认只提取启动子区域）")
+    parser.add_argument("--promoter-upstream", type=int, default=1000, help="TSS上游长度（默认: 1000）")
+    parser.add_argument("--promoter-downstream", type=int, default=100, help="TSS下游长度（默认: 100）")
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        stream=sys.stderr
+    )
+
+    extractor = SequenceExtractor()
+    # 默认提取启动子区域；--full-gene 时提取完整基因
+    config = {
+        "promoter": not args.full_gene,
+        "promoter_upstream": args.promoter_upstream,
+        "promoter_downstream": args.promoter_downstream,
+        "flanking": args.flanking
+    }
+
+    result = extractor.run_extraction(
+        input_file=args.genes,
+        genome_file=args.genome,
+        annotation_file=args.annotation,
+        output_dir=os.path.dirname(args.output),
+        config=config
+    )
+
+    # 如果提取器输出文件名不匹配，重命名
+    expected = os.path.join(os.path.dirname(args.output), "gene_sequences.fasta")
+    if os.path.exists(expected) and expected != args.output:
+        import shutil
+        shutil.copy2(expected, args.output)
+
+    if result:
+        logger.info("序列提取完成")
+        sys.exit(0)
+    else:
+        logger.error("序列提取失败")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

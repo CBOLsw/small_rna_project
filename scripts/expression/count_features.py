@@ -260,7 +260,7 @@ class FeatureCounter:
                 "-O",  # 允许reads分配到多个特征
                 "-M",  # 允许多重比对reads
                 "--primary",  # 只计数主要比对
-                "-s", str(config.get('strand_specific', 0)),  # 链特异性
+                "-s", str(config.get('strandness', 0)),  # 链特异性 0=unstranded
             ])
         else:
             cmd.extend(["-t", config.get('feature_type', 'exon')])

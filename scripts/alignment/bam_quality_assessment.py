@@ -48,6 +48,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 压制matplotlib的冗余INFO日志
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+logging.getLogger('matplotlib.category').setLevel(logging.WARNING)
+
 
 class BAMQualityAssessor:
     """BAM文件质量评估类"""
@@ -151,10 +155,6 @@ class BAMQualityAssessor:
 
             # 保存结果
             self._save_quality_metrics(metrics, stats_file, json_file)
-
-            # 生成可视化图表（如果可用）
-            if HAS_VIS:
-                self._generate_visualizations(metrics, sample_name, output_dir)
 
             logger.info(f"BAM质量评估完成: {sample_name}")
 
@@ -278,61 +278,97 @@ class BAMQualityAssessor:
 
     def _analyze_genome_coverage(self, bam_file: str, sample_name: str,
                                output_dir: Path) -> Dict[str, Any]:
-        """分析基因组覆盖度"""
+        """分析基因组覆盖度（使用mosdepth，比samtools depth快10-50倍）"""
         stats = {}
 
         try:
-            # 使用samtools depth获取覆盖度
-            cmd = [self.samtools_path, "depth", "-a", bam_file]
+            prefix = output_dir / f"{sample_name}_mosdepth"
+            cmd = ["mosdepth", "-n", str(prefix), bam_file]
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
+                timeout=600
             )
 
-            if result.returncode == 0 and result.stdout.strip():
-                lines = result.stdout.strip().split('\n')
+            if result.returncode != 0:
+                logger.warning(f"mosdepth运行失败: {result.stderr[:200]}")
+                return stats
+
+            # 解析全局覆盖度分布
+            dist_file = Path(f"{prefix}.mosdepth.global.dist.txt")
+            if dist_file.exists():
                 depths = []
+                props = []
+                with open(dist_file) as f:
+                    for line in f:
+                        parts = line.strip().split()
+                        if len(parts) == 3 and parts[0] == "total":
+                            depths.append(int(parts[1]))
+                            props.append(float(parts[2]))
 
-                for line in lines:
-                    if line.strip():
-                        parts = line.split()
-                        if len(parts) >= 3:
-                            depths.append(int(parts[2]))
+                if len(props) > 1:
+                    # 基尼系数近似：面积法
+                    stats['mean_coverage'] = float(np.trapz(props, depths))
+                    stats['median_coverage'] = 0.0
+                    for d, p in zip(depths, props):
+                        if p >= 0.5:
+                            stats['median_coverage'] = float(d)
+                            break
 
-                if depths:
-                    depth_array = np.array(depths)
+                    stats['max_coverage'] = max(depths)
 
-                    stats.update({
-                        'mean_coverage': float(np.mean(depth_array)),
-                        'median_coverage': float(np.median(depth_array)),
-                        'coverage_std': float(np.std(depth_array)),
-                        'zero_coverage_positions': int(np.sum(depth_array == 0)),
-                        'coverage_10x': float(np.sum(depth_array >= 10) / len(depth_array)),
-                        'coverage_30x': float(np.sum(depth_array >= 30) / len(depth_array)),
-                        'max_coverage': int(np.max(depth_array))
-                    })
+                    # 累积分布中提取关键阈值
+                    for d, p in zip(depths, props):
+                        if d == 1 and p >= 0:
+                            stats['covered_bases_rate'] = p
+                        if d >= 10 and 'coverage_10x' not in stats:
+                            stats['coverage_10x'] = p
+                        if d >= 30 and 'coverage_30x' not in stats:
+                            stats['coverage_30x'] = p
 
-                    # 保存覆盖度统计
-                    cov_file = output_dir / f"{sample_name}_coverage_stats.txt"
-                    with open(cov_file, 'w') as f:
-                        f.write(f"平均覆盖度: {stats['mean_coverage']:.2f}\n")
-                        f.write(f"中位覆盖度: {stats['median_coverage']:.2f}\n")
-                        f.write(f"覆盖度标准差: {stats['coverage_std']:.2f}\n")
-                        f.write(f"零覆盖位点数: {stats['zero_coverage_positions']:,}\n")
-                        f.write(f"≥10x覆盖比例: {stats['coverage_10x']*100:.2f}%\n")
-                        f.write(f"≥30x覆盖比例: {stats['coverage_30x']*100:.2f}%\n")
-                        f.write(f"最大覆盖度: {stats['max_coverage']}\n")
+                    # 保存分布数据
+                    dist_out = output_dir / f"{sample_name}_coverage_dist.txt"
+                    with open(dist_out, 'w') as f:
+                        f.write("Depth\tProportion≥Depth\n")
+                        for d, p in zip(depths, props):
+                            f.write(f"{d}\t{p:.6f}\n")
 
-                    # 生成覆盖度分布可视化
+                    # 可视化
                     if HAS_VIS:
-                        self._plot_coverage_distribution(depth_array, sample_name, output_dir)
+                        self._plot_coverage_distribution_mosdepth(
+                            depths, props, sample_name, output_dir
+                        )
 
+            # 解析染色体级别汇总
+            summary_file = Path(f"{prefix}.mosdepth.summary.txt")
+            if summary_file.exists():
+                chrom_depths = []
+                with open(summary_file) as f:
+                    for line in f:
+                        parts = line.strip().split()
+                        if len(parts) >= 4 and parts[0] != "chrom":
+                            try:
+                                chrom_depths.append(float(parts[3]))
+                            except ValueError:
+                                pass
+                if chrom_depths:
+                    stats['mean_coverage'] = float(np.mean(chrom_depths))
+
+            # 清理mosdepth临时文件
+            for f in Path(output_dir).glob(f"{sample_name}_mosdepth*"):
+                f.unlink()
+
+        except subprocess.TimeoutExpired:
+            logger.warning(f"mosdepth超时（{sample_name}），跳过覆盖度分析")
+        except FileNotFoundError:
+            logger.warning("mosdepth未安装，跳过覆盖度分析")
         except Exception as e:
             logger.warning(f"分析基因组覆盖度时出错: {e}")
 
         return stats
+
 
     def _analyze_insert_size(self, bam_file: str, sample_name: str,
                            output_dir: Path) -> Dict[str, Any]:
@@ -456,8 +492,9 @@ class BAMQualityAssessor:
                 f.write("Genome Coverage Statistics:\n")
                 f.write(f"  Mean coverage: {metrics.get('mean_coverage', 0):.2f}\n")
                 f.write(f"  Median coverage: {metrics.get('median_coverage', 0):.2f}\n")
-                f.write(f"  ≥10x coverage rate: {metrics.get('coverage_10x', 0)*100:.2f}%\n")
-                f.write(f"  ≥30x coverage rate: {metrics.get('coverage_30x', 0)*100:.2f}%\n")
+                f.write(f"  Genome covered (≥1x): {metrics.get('covered_bases_rate', 0)*100:.2f}%\n")
+                f.write(f"  ≥10x coverage: {metrics.get('coverage_10x', 0)*100:.2f}%\n")
+                f.write(f"  ≥30x coverage: {metrics.get('coverage_30x', 0)*100:.2f}%\n")
 
             # 保存为JSON
             with open(json_file, 'w') as f:
@@ -552,6 +589,65 @@ class BAMQualityAssessor:
 
         except Exception as e:
             logger.warning(f"绘制覆盖度分布图时出错: {e}")
+
+    def _plot_coverage_distribution_mosdepth(self, depths: List[int],
+                                            props: List[float],
+                                            sample_name: str, output_dir: Path):
+        """绘制mosdepth覆盖度累积分布图"""
+        try:
+            plt.figure(figsize=(12, 5))
+
+            # 子图1: 覆盖率柱状图（关键阈值）
+            plt.subplot(1, 2, 1)
+            thresholds = [1, 5, 10, 15, 20, 30, 50]
+            t_props = []
+            for t in thresholds:
+                for d, p in zip(depths, props):
+                    if d >= t:
+                        t_props.append(p)
+                        break
+                else:
+                    t_props.append(0)
+
+            colors = ['#fee5d9','#fcae91','#fb6a4a','#de2d26','#a50f15','#67000d','#300000']
+            bars = plt.bar([str(t) for t in thresholds], t_props,
+                          color=colors[:len(thresholds)], alpha=0.8)
+            for bar, p in zip(bars, t_props):
+                if p > 0.05:
+                    plt.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
+                            f'{p:.0%}', ha='center', va='bottom', fontsize=9)
+
+            plt.xlabel('Coverage Depth Threshold')
+            plt.ylabel('Proportion of Genome ≥ Threshold')
+            plt.title(f'{sample_name} - Coverage at Thresholds')
+            plt.grid(True, alpha=0.3, axis='y')
+
+            # 子图2: 累积覆盖度曲线
+            plt.subplot(1, 2, 2)
+            plt.plot(depths, props, 'b-', linewidth=2)
+            plt.fill_between(depths, props, alpha=0.15, color='blue')
+            for t in [1, 5, 10, 30]:
+                for d, p in zip(depths, props):
+                    if d == t:
+                        plt.plot(t, p, 'ro')
+                        plt.text(t, p + 0.03, f'{p:.1%}', ha='center')
+                    elif d < t < depths[props.index(p) + 1] if props.index(p) + 1 < len(props) else True:
+                        pass
+
+            plt.xlabel('Coverage Depth')
+            plt.ylabel('Proportion of Genome ≥ Depth')
+            plt.title(f'{sample_name} - Cumulative Coverage')
+            plt.grid(True, alpha=0.3)
+            plt.xlim(0, min(max(depths), 100))
+
+            plot_file = output_dir / f"{sample_name}_coverage_distribution.png"
+            plt.tight_layout()
+            plt.savefig(plot_file, dpi=150)
+            plt.close()
+            logger.info(f"覆盖度分布图已生成: {plot_file}")
+
+        except Exception as e:
+            logger.warning(f"绘制mosdepth覆盖度分布图时出错: {e}")
 
     def _plot_insert_size_distribution(self, insert_sizes: List[int],
                                      sample_name: str, output_dir: Path):
@@ -654,13 +750,13 @@ class BAMQualityAssessor:
                 f.write(f"    Mapping rate: {row['mapping_rate']*100:.1f}%\n")
                 f.write(f"    High quality rate: {row['high_quality_rate']*100:.1f}%\n")
                 f.write(f"    Mean coverage: {row['mean_coverage']:.2f}\n")
-                f.write(f"    ≥10x coverage rate: {row['coverage_10x']*100:.1f}%\n\n")
+                f.write(f"    ≥10x coverage: {row['coverage_10x']*100:.1f}%\n\n")
 
             f.write("Overall statistics:\n")
             f.write(f"  Mean mapping rate: {df['mapping_rate'].mean()*100:.1f}%\n")
             f.write(f"  Mean high quality rate: {df['high_quality_rate'].mean()*100:.1f}%\n")
             f.write(f"  Mean coverage: {df['mean_coverage'].mean():.2f}\n")
-            f.write(f"  Mean ≥10x coverage rate: {df['coverage_10x'].mean()*100:.1f}%\n\n")
+            f.write(f"  Mean ≥10x coverage: {df['coverage_10x'].mean()*100:.1f}%\n\n")
 
             f.write(f"报告生成时间: {pd.Timestamp.now()}\n")
 

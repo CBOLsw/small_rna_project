@@ -1,15 +1,14 @@
 name: small_rna_analysis
 channels:
-  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge
-  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/bioconda
-  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
-  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r
+  - conda-forge
+  - bioconda
+  - defaults
 variables:
   R_PROFILE_USER: "${CONDA_PREFIX}/.Rprofile"
   BIOCONDUCTOR_MIRROR: "https://mirrors.tuna.tsinghua.edu.cn/bioconductor"
   R_REPOSITORIES: "https://mirrors.tuna.tsinghua.edu.cn/CRAN/"
 dependencies:
-  - python=3.9
+  - python=3.10
   - pip
   - freetype
   - fontconfig
@@ -19,17 +18,18 @@ dependencies:
   - bowtie2
   - samtools=1.17
   - subread=2.0
+  - mosdepth=0.3
   - r-base=4.3
-  - r-essentials
-  - r-tidyverse
   - r-ggplot2
+  - r-dplyr
   - r-pheatmap
-  - r-gplots
-  - r-reshape2
-  - r-rcurl
-  - r-devtools
-  - meme=5.5
-  - snakemake=7.32
+  - r-optparse
+  - r-ggrepel
+  - r-rcolorbrewer
+  - bioconductor-deseq2
+  - bioconductor-apeglm
+  - meme
+  - snakemake>=7.32,<8
   - pyyaml
   - pip:
     - biopython==1.81
