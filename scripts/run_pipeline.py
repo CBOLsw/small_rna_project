@@ -139,6 +139,7 @@ def run_snakemake(config: Dict[str, Any],
         '--latency-wait', str(config['snakemake']['latency_wait']),
         '--restart-times', str(config['snakemake']['restart_times']),
         '--printshellcmds',  # 显示正在执行的shell命令
+        '--rerun-triggers', 'mtime',  # 仅根据文件修改时间判断是否重新运行
     ]
 
     if dry_run:
