@@ -151,6 +151,7 @@ openspec/changes/archive/
 data/*
 !data/.gitkeep
 !data/metadata/.gitkeep
+!data/metadata/sample_info.csv
 !data/raw_fastq/.gitkeep
 !data/processed/.gitkeep
 results/*

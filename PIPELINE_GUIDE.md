@@ -45,7 +45,7 @@ small_rna_project/
 ### 第一步：一键安装 (推荐)
 
 ```bash
-cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
+cd small_rna_project
 
 # 给脚本添加执行权限
 chmod +x scripts/setup/install_everything.sh
@@ -57,7 +57,7 @@ chmod +x scripts/setup/install_everything.sh
 ### 手动安装
 
 ```bash
-cd /mnt/c/Users/24584/PycharmProjects/small_rna_project
+cd small_rna_project
 
 # 1. 创建并激活 conda 环境
 conda env create -f envs/small_rna_analysis.yaml
