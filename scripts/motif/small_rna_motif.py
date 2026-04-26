@@ -643,7 +643,6 @@ def run_tomtom_analysis(motif_file: str, output_dir: str,
             '-o', str(output_path),
             '-thresh', str(evalue_threshold),
             '-min-overlap', str(min_overlap),
-            '-text',  # 输出文本格式便于解析
             motif_file,
             database
         ]
@@ -661,8 +660,11 @@ def run_tomtom_analysis(motif_file: str, output_dir: str,
 
         logger.info("TomTom分析完成")
 
-        # 解析主要结果
+        # 解析主要结果（TomTom会生成tomtom.txt文件）
         txt_file = output_path / 'tomtom.txt'
+        if not txt_file.exists():
+            # 尝试从stdout获取（如果用了-text）
+            logger.info("tomtom.txt不存在，尝试解析其他输出")
         comparisons = parse_tomtom_result(txt_file) if txt_file.exists() else []
 
         result = {
