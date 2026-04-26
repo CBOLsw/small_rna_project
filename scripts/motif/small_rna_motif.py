@@ -915,6 +915,187 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
     return summary
 
 
+def run_mirbase_alignment(config: Dict[str, Any]) -> Dict[str, Any]:
+    """仅运行miRBase比对步骤"""
+    motif_cfg = config.get('motif_analysis', {})
+    mirbase_cfg = motif_cfg.get('mirbase', {})
+    ref_cfg = config.get('reference', {})
+
+    min_len = mirbase_cfg.get('min_len', 18)
+    max_len = mirbase_cfg.get('max_len', 35)
+    max_misms = mirbase_cfg.get('max_mismatches', 1)
+    threads = motif_cfg.get('meme', {}).get('threads', 4)
+
+    mirbase_fasta = ref_cfg.get('mirbase_fasta', 'references/hsa.mature.fa')
+    index_path = ref_cfg.get('mirbase_bowtie2_index', 'references/bowtie2_index/hsa_mirbase')
+
+    results_dir = Path(config.get('directories', {}).get('results', 'results'))
+    motif_results_dir = results_dir / 'small_rna_motif'
+    motif_results_dir.mkdir(parents=True, exist_ok=True)
+
+    combined_fasta = motif_results_dir / 'mirna_reads.fasta'
+
+    # 检查点：如果mirna_reads.fasta已存在，跳过
+    if combined_fasta.exists():
+        logger.info("检测到mirna_reads.fasta已存在，跳过miRBase比对")
+        return {'success': True, 'skipped': True, 'message': 'mirna_reads.fasta已存在，跳过'}
+
+    # 确保miRBase序列存在
+    mirbase_fasta = ensure_mirbase_fasta(config)
+
+    # 构建索引
+    if not build_mirbase_index(mirbase_fasta, index_path, threads):
+        return {'success': False, 'error': 'miRBase索引构建失败'}
+
+    # 获取所有样本
+    metadata_file = config.get('samples', {}).get('metadata_file', 'data/metadata/sample_info.csv')
+    if os.path.exists(metadata_file):
+        df = pd.read_csv(metadata_file)
+        samples = df[config['samples']['sample_column']].tolist()
+    else:
+        samples = ["GAO_1", "GAO_2", "GAO_3", "PAL_1", "PAL_2", "PAL_3"]
+
+    # 每个样本比对到miRBase
+    all_reads = []
+    sample_stats = {}
+
+    for sample in samples:
+        trimmed_fastq = get_sample_trimmed_fastq(sample, config)
+        sam_file = motif_results_dir / f"{sample}_mirbase.sam"
+
+        # 如果SAM文件已存在且不需要重新运行，跳过
+        if sam_file.exists():
+            logger.info(f"SAM文件已存在: {sam_file}，跳过此样本")
+        else:
+            success, mapped = map_to_mirbase(
+                trimmed_fastq, index_path, str(sam_file),
+                min_len, max_len, max_misms, threads
+            )
+            sample_stats[sample] = {'success': success, 'mapped_reads': mapped}
+
+        # 提取reads
+        if sam_file.exists():
+            reads = extract_mirna_reads_direct(str(trimmed_fastq), str(sam_file), min_len, max_len)
+            all_reads.extend(reads)
+            logger.info(f"  {sample}: 提取{len(reads)}条reads")
+
+    # 保存合并的reads
+    save_reads_to_fasta(all_reads, str(combined_fasta))
+
+    logger.info(f"=== miRBase比对完成 ===")
+    logger.info(f"总唯一reads: {len(set(all_reads))}")
+
+    return {
+        'success': True,
+        'sample_stats': sample_stats,
+        'total_reads': len(set(all_reads)),
+        'combined_fasta': str(combined_fasta)
+    }
+
+
+def run_meme_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
+    """仅运行MEME分析步骤"""
+    motif_cfg = config.get('motif_analysis', {})
+    meme_cfg = motif_cfg.get('meme', {})
+
+    results_dir = Path(config.get('directories', {}).get('results', 'results'))
+    motif_results_dir = results_dir / 'small_rna_motif'
+    combined_fasta = motif_results_dir / 'mirna_reads.fasta'
+    meme_summary_file = motif_results_dir / 'meme_results' / 'meme_summary.json'
+
+    # 检查点：如果meme_summary.json已存在，跳过
+    if meme_summary_file.exists():
+        logger.info("检测到meme_summary.json已存在，跳过MEME分析")
+        return {'success': True, 'skipped': True, 'message': 'meme_summary.json已存在，跳过'}
+
+    # 检查输入文件
+    if not combined_fasta.exists():
+        logger.error(f"mirna_reads.fasta不存在，请先运行miRBase比对步骤")
+        return {'success': False, 'error': 'mirna_reads.fasta不存在'}
+
+    # 创建MEME输出目录
+    meme_results_dir = motif_results_dir / 'meme_results'
+    meme_results_dir.mkdir(parents=True, exist_ok=True)
+
+    # 运行MEME
+    meme_result = run_meme_on_small_rna(
+        str(combined_fasta),
+        str(meme_results_dir),
+        width_min=meme_cfg.get('min_width', 5),
+        width_max=meme_cfg.get('max_width', 8),
+        max_motifs=meme_cfg.get('max_motifs', 3),
+        evalue_threshold=meme_cfg.get('evalue_threshold', 1e-4),
+        min_sites=meme_cfg.get('minsites', 10),
+        max_sites=meme_cfg.get('maxsites', 100),
+        searchsize=meme_cfg.get('searchsize', 100000)
+    )
+
+    # 保存MEME摘要JSON
+    meme_summary_file.parent.mkdir(parents=True, exist_ok=True)
+    meme_summary_data = {
+        'success': meme_result.get('success', False),
+        'motifs_found': meme_result.get('motifs_found', 0),
+        'motifs': meme_result.get('motifs', []),
+        'output_dir': meme_result.get('output_dir', '')
+    }
+    with open(meme_summary_file, 'w') as f:
+        json.dump(meme_summary_data, f, indent=2)
+
+    logger.info(f"=== MEME分析完成 ===")
+    logger.info(f"Motif发现数: {meme_result.get('motifs_found', 0)}")
+
+    return {
+        'success': meme_result.get('success', False),
+        'motifs_found': meme_result.get('motifs_found', 0),
+        'meme_result': meme_result
+    }
+
+
+def run_tomtom_only(config: Dict[str, Any]) -> Dict[str, Any]:
+    """仅运行TomTom比对步骤"""
+    motif_cfg = config.get('motif_analysis', {})
+    tomtom_cfg = motif_cfg.get('tomtom', {})
+
+    results_dir = Path(config.get('directories', {}).get('results', 'results'))
+    motif_results_dir = results_dir / 'small_rna_motif'
+    meme_xml_file = motif_results_dir / 'meme_results' / 'meme.xml'
+    tomtom_summary_file = motif_results_dir / 'tomtom_results' / 'tomtom_summary.json'
+
+    # 检查点：如果tomtom_summary.json已存在，跳过
+    if tomtom_summary_file.exists():
+        logger.info("检测到tomtom_summary.json已存在，跳过TomTom分析")
+        return {'success': True, 'skipped': True, 'message': 'tomtom_summary.json已存在，跳过'}
+
+    # 检查输入文件
+    if not meme_xml_file.exists():
+        logger.error(f"meme.xml不存在，请先运行MEME分析步骤")
+        return {'success': False, 'error': 'meme.xml不存在'}
+
+    # 创建TomTom输出目录
+    tomtom_results_dir = motif_results_dir / 'tomtom_results'
+    tomtom_results_dir.mkdir(parents=True, exist_ok=True)
+
+    # 运行TomTom
+    tomtom_result = run_tomtom_analysis(
+        motif_file=str(meme_xml_file),
+        output_dir=str(tomtom_results_dir),
+        database=tomtom_cfg.get('database', None),
+        evalue_threshold=tomtom_cfg.get('evalue_threshold', 0.05),
+        min_overlap=tomtom_cfg.get('min_overlap', 5)
+    )
+
+    # 保存TomTom摘要JSON
+    if tomtom_result.get('success', False):
+        tomtom_summary_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(tomtom_summary_file, 'w') as f:
+            json.dump(tomtom_result, f, indent=2)
+
+    logger.info(f"=== TomTom分析完成 ===")
+    logger.info(f"发现 {tomtom_result.get('comparisons_found', 0)} 个显著motif比对")
+
+    return tomtom_result
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Small RNA motif分析 - 从测序数据发现miRNA上的富集motif"
@@ -922,6 +1103,8 @@ def main():
     parser.add_argument('--config', default='config/config.yaml',
                        help='配置文件路径')
     parser.add_argument('--sample', help='只分析指定样本')
+    parser.add_argument('--step', choices=['mirbase', 'meme', 'tomtom'],
+                       help='只运行指定步骤：mirbase(miRBase比对), meme(MEME分析), tomtom(TomTom比对)')
 
     args = parser.parse_args()
 
@@ -933,9 +1116,18 @@ def main():
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
 
-    logger.info("=== Small RNA Motif分析开始 ===")
-
-    result = run_small_rna_motif_analysis(config)
+    if args.step:
+        # 运行指定步骤
+        if args.step == 'mirbase':
+            result = run_mirbase_alignment(config)
+        elif args.step == 'meme':
+            result = run_meme_analysis(config)
+        elif args.step == 'tomtom':
+            result = run_tomtom_only(config)
+    else:
+        # 运行完整流程
+        logger.info("=== Small RNA Motif分析开始 ===")
+        result = run_small_rna_motif_analysis(config)
 
     if result.get('success'):
         logger.info("分析成功完成!")
