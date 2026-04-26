@@ -25,7 +25,6 @@ small_rna_project/
 ├── references/             # 参考基因组文件
 │   ├── hg38.fa(.gz)       # hg38 基因组序列
 │   ├── hg38.knownGene.gtf(.gz)  # 基因注释
-│   ├── hg38.mirbase.gff3  # miRBase small RNA 注释
 │   ├── hsa.mature.fa       # 人类成熟miRNA序列 (自动下载)
 │   └── bowtie2_index/     # Bowtie2 索引 (自动构建)
 ├── scripts/                # 分析脚本
