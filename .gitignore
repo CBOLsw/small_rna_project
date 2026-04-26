@@ -188,6 +188,9 @@ references/*
 # 但允许提交接头序列文件
 !config/VAHTS-SmallRNA-V2.fa
 
+# Dockerfile已删除
+Dockerfile
+
 # Temporary files
 *.tmp
 *.temp
