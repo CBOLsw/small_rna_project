@@ -483,50 +483,25 @@ def ensure_motif_database(database: Optional[str] = None) -> Optional[str]:
     db_dir = Path("references/motif_databases/JASPAR")
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    # JASPAR MEME格式数据库下载地址
-    # 优先尝试JASPAR2024vertebrates
+    # JASPAR 2026 MEME格式数据库下载地址（非冗余版本）
     urls = [
-        "https://meme-suite.org/meme/meme-software/Databases/motifs/motif_databases.12.25.tgz",
-        "https://meme.nbwr.com/meme/meme-software/Databases/motifs/motif_databases.12.23.tgz",
+        "https://jaspar.elixir.no/download/data/2026/CORE/JASPAR2026_CORE_vertebrates_non-redundant_pfms_meme.txt",
+        "https://jaspar.genereg.net/static/latest/JASPAR2024_CORE_vertebrates_non-redundant_pfms_meme.txt",
     ]
 
-    tgz_path = db_dir.parent / "motif_databases.tgz"
+    meme_path = db_dir / "JASPAR2026_CORE_vertebrates_non-redundant_pfms_meme.meme"
 
     for url in urls:
         try:
-            logger.info(f"下载motif数据库: {url}")
-            urllib.request.urlretrieve(url, tgz_path)
-            logger.info("下载完成，解压中...")
-
-            import tarfile
-            with tarfile.open(tgz_path, "r:gz") as tar:
-                tar.extractall(path=db_dir.parent)
-            tgz_path.unlink()
-
-            # 查找JASPAR文件
-            for jaspar_db in db_dir.glob("JASPAR*_CORE_vertebrates_non-redundant.meme"):
-                logger.info(f"数据库就绪: {jaspar_db}")
-                return str(jaspar_db)
-
-            break
-        except Exception as e:
-            logger.warning(f"下载失败 ({url}): {e}")
-            if tgz_path.exists():
-                tgz_path.unlink()
-            continue
-
-    # 备选：直接下载JASPAR MEME文件（如果完整包太大）
-    meme_url = "https://jaspar2024.genereg.net/static/latest/JASPAR2024_CORE_vertebrates_non-redundant.meme.txt"
-    meme_path = db_dir / "JASPAR2024_CORE_vertebrates_non-redundant.meme"
-
-    if not meme_path.exists():
-        try:
-            logger.info(f"尝试直接下载JASPAR: {meme_url}")
-            urllib.request.urlretrieve(meme_url, meme_path)
+            logger.info(f"下载JASPAR数据库: {url}")
+            urllib.request.urlretrieve(url, meme_path)
             logger.info(f"数据库已保存: {meme_path}")
             return str(meme_path)
         except Exception as e:
-            logger.warning(f"直接下载失败: {e}")
+            logger.warning(f"下载失败 ({url}): {e}")
+            if meme_path.exists():
+                meme_path.unlink()
+            continue
 
     logger.warning("未找到JASPAR数据库，TomTom分析将跳过")
     return None

@@ -145,27 +145,21 @@ references/hsa.mature.fa
 
 ### Motif数据库（TomTom用）
 
-JASPAR motif数据库用于TomTom比对分析，**建议手动下载**（约1-2GB）：
+JASPAR motif数据库用于TomTom比对分析，**建议手动下载**：
 
 | 文件 | 大小 | 下载地址 |
 |------|------|----------|
-| motif_databases.tgz | ~1-2 GB | https://meme-suite.org/meme/meme-software/Databases/motifs/motif_databases.12.25.tgz |
+| JASPAR2026_CORE_vertebrates_non-redundant_pfms_meme.txt | ~20 MB | https://jaspar.elixir.no/download/data/2026/CORE/JASPAR2026_CORE_vertebrates_non-redundant_pfms_meme.txt |
 
 **放置位置：**
 ```
 references/
 └── motif_databases/
     └── JASPAR/
-        └── JASPAR2024_CORE_vertebrates_non-redundant.meme
+        └── JASPAR2026_CORE_vertebrates_non-redundant_pfms_meme.meme
 ```
 
-解压命令：
-```bash
-cd references/
-tar -xzf motif_databases.tgz
-```
-
-如不手动下载，流程会自动从网络下载（耗时较长）。
+如不手动下载，流程会自动从网络下载。
 
 ## run_pipeline.py 参数说明
 

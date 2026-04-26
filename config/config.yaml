@@ -103,7 +103,7 @@ motif_analysis:
     min_overlap: 5
     # 自动下载源（仅在database为null时使用）
     # 推荐手动下载大文件以加快部署速度
-    download_url: "https://meme-suite.org/meme/meme-software/Databases/motifs/motif_databases.12.25.tgz"
+    download_url: "https://jaspar.elixir.no/download/data/2026/CORE/JASPAR2026_CORE_vertebrates_non-redundant_pfms_meme.txt"
   filtering:
     evalue_threshold: 1e-4
     min_sites: 10
