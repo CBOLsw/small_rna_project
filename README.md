@@ -92,7 +92,7 @@ python scripts/run_pipeline.py --config config/config.yaml --module motif --core
 | `results/alignment/` | BAM文件、比对视图 |
 | `results/counts/` | 基因表达矩阵 |
 | `results/differential_expression/` | DEGs、火山图、热图 |
-| `results/motif_analysis/` | motif结果、可视化 |
+| `results/small_rna_motif/` | Small RNA motif分析结果 |
 
 ## 参数配置
 

@@ -621,8 +621,8 @@ def main():
     # 加载配置
     config = load_config(args.config)
 
-    # 创建报告目录
-    report_dir = args.output if args.output else create_report_directory(config)
+    # 创建报告目录（使用results/summary作为默认输出）
+    report_dir = args.output if args.output else os.path.join(config['directories']['results'], 'summary')
     Path(report_dir).mkdir(parents=True, exist_ok=True)
 
     # 收集各模块结果

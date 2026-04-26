@@ -42,9 +42,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 │   ├── alignment/                # 序列比对结果
 │   ├── counts/                   # 基因计数结果
 │   ├── differential_expression/  # 差异表达分析结果
-│   └── motif_analysis/           # Motif分析结果
+│   └── small_rna_motif/          # Small RNA motif分析结果
 ├── logs/                         # 运行日志
-├── reports/                      # 分析报告
 ├── envs/                         # 环境配置文件
 ├── notebooks/                    # Jupyter分析笔记本
 └── openspec/                     # OpenSpec变更管理

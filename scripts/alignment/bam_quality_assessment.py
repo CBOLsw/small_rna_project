@@ -278,96 +278,9 @@ class BAMQualityAssessor:
 
     def _analyze_genome_coverage(self, bam_file: str, sample_name: str,
                                output_dir: Path) -> Dict[str, Any]:
-        """分析基因组覆盖度（使用mosdepth，比samtools depth快10-50倍）"""
-        stats = {}
-
-        try:
-            prefix = output_dir / f"{sample_name}_mosdepth"
-            cmd = ["mosdepth", "-n", str(prefix), bam_file]
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=600
-            )
-
-            if result.returncode != 0:
-                logger.warning(f"mosdepth运行失败: {result.stderr[:200]}")
-                return stats
-
-            # 解析全局覆盖度分布
-            dist_file = Path(f"{prefix}.mosdepth.global.dist.txt")
-            if dist_file.exists():
-                depths = []
-                props = []
-                with open(dist_file) as f:
-                    for line in f:
-                        parts = line.strip().split()
-                        if len(parts) == 3 and parts[0] == "total":
-                            depths.append(int(parts[1]))
-                            props.append(float(parts[2]))
-
-                if len(props) > 1:
-                    # 基尼系数近似：面积法
-                    stats['mean_coverage'] = float(np.trapz(props, depths))
-                    stats['median_coverage'] = 0.0
-                    for d, p in zip(depths, props):
-                        if p >= 0.5:
-                            stats['median_coverage'] = float(d)
-                            break
-
-                    stats['max_coverage'] = max(depths)
-
-                    # 累积分布中提取关键阈值
-                    for d, p in zip(depths, props):
-                        if d == 1 and p >= 0:
-                            stats['covered_bases_rate'] = p
-                        if d >= 10 and 'coverage_10x' not in stats:
-                            stats['coverage_10x'] = p
-                        if d >= 30 and 'coverage_30x' not in stats:
-                            stats['coverage_30x'] = p
-
-                    # 保存分布数据
-                    dist_out = output_dir / f"{sample_name}_coverage_dist.txt"
-                    with open(dist_out, 'w') as f:
-                        f.write("Depth\tProportion≥Depth\n")
-                        for d, p in zip(depths, props):
-                            f.write(f"{d}\t{p:.6f}\n")
-
-                    # 可视化
-                    if HAS_VIS:
-                        self._plot_coverage_distribution_mosdepth(
-                            depths, props, sample_name, output_dir
-                        )
-
-            # 解析染色体级别汇总
-            summary_file = Path(f"{prefix}.mosdepth.summary.txt")
-            if summary_file.exists():
-                chrom_depths = []
-                with open(summary_file) as f:
-                    for line in f:
-                        parts = line.strip().split()
-                        if len(parts) >= 4 and parts[0] != "chrom":
-                            try:
-                                chrom_depths.append(float(parts[3]))
-                            except ValueError:
-                                pass
-                if chrom_depths:
-                    stats['mean_coverage'] = float(np.mean(chrom_depths))
-
-            # 清理mosdepth临时文件
-            for f in Path(output_dir).glob(f"{sample_name}_mosdepth*"):
-                f.unlink()
-
-        except subprocess.TimeoutExpired:
-            logger.warning(f"mosdepth超时（{sample_name}），跳过覆盖度分析")
-        except FileNotFoundError:
-            logger.warning("mosdepth未安装，跳过覆盖度分析")
-        except Exception as e:
-            logger.warning(f"分析基因组覆盖度时出错: {e}")
-
-        return stats
+        """分析基因组覆盖度（已禁用，small RNA数据不适合全基因组覆盖分析）"""
+        logger.info("全基因组覆盖度分析已禁用（small RNA数据请使用miRBase比对结果）")
+        return {}
 
 
     def _analyze_insert_size(self, bam_file: str, sample_name: str,
