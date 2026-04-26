@@ -184,20 +184,6 @@ def collect_motif_results(config: Dict[str, Any]) -> Dict[str, Any]:
             except Exception as e:
                 logger.warning(f"无法读取MEME摘要: {e}")
 
-    # TomTom结果
-    tomtom_dir = os.path.join(motif_dir, 'tomtom_results')
-    if os.path.exists(tomtom_dir):
-        results['tomtom_dir'] = tomtom_dir
-        summary_file = os.path.join(tomtom_dir, 'tomtom_summary.json')
-        if os.path.exists(summary_file):
-            try:
-                with open(summary_file, 'r') as f:
-                    tomtom_summary = json.load(f)
-                results['tomtom_summary'] = tomtom_summary
-                logger.info(f"TomTom结果已收集: {tomtom_summary['comparisons_found']} 个比对")
-            except Exception as e:
-                logger.warning(f"无法读取TomTom摘要: {e}")
-
     # 可视化结果
     visualization_dir = os.path.join(motif_dir, 'visualization')
     if os.path.exists(visualization_dir):

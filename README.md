@@ -82,7 +82,7 @@ python scripts/run_pipeline.py --config config/config.yaml --module motif --core
 2. **序列比对** - Bowtie2 → hg38
 3. **基因计数** - featureCounts
 4. **差异表达分析** - DESeq2
-5. **Motif 发现** - MEME Suite + TomTom
+5. **Motif 发现** - MEME Suite (de novo motif发现)
 
 ## 结果目录
 

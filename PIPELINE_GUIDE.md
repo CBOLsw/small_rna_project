@@ -10,7 +10,7 @@
 2. **序列比对** - Bowtie2 将测序 reads 比对到参考基因组 hg38
 3. **基因计数** - featureCounts 统计每个基因的 reads 数目
 4. **差异表达分析** - DESeq2 找出 GAO 组和 PAL 组之间的差异表达基因
-5. **Motif 发现** - MEME Suite 发现差异表达基因中的序列保守模式
+5. **Motif 发现** - MEME Suite 对 miRNA reads 进行 de novo motif 发现
 
 ## 目录结构
 
@@ -143,24 +143,6 @@ miRBase small RNA 注释文件较小 (~500KB)，脚本会直接下载：
 references/hsa.mature.fa
 ```
 
-### Motif数据库（TomTom用）
-
-JASPAR motif数据库用于TomTom比对分析，**建议手动下载**：
-
-| 文件 | 大小 | 下载地址 |
-|------|------|----------|
-| JASPAR2026_CORE_vertebrates_non-redundant_pfms_meme.txt | ~20 MB | https://jaspar.elixir.no/download/data/2026/CORE/JASPAR2026_CORE_vertebrates_non-redundant_pfms_meme.txt |
-
-**放置位置：**
-```
-references/
-└── motif_databases/
-    └── JASPAR/
-        └── JASPAR2026_CORE_vertebrates_non-redundant_pfms_meme.meme
-```
-
-如不手动下载，流程会自动从网络下载。
-
 ## run_pipeline.py 参数说明
 
 | 参数 | 功能 | 示例 |
@@ -238,7 +220,7 @@ motif_analysis:
 | `alignment/` | BAM 文件、比对统计信息 |
 | `counts/` | 基因表达矩阵 (gene_counts.csv) |
 | `differential_expression/` | DEGs列表、火山图、热图 |
-| `small_rna_motif/` | Small RNA motif分析结果（miRBase比对、唯一reads、MEME motifs）|
+| `small_rna_motif/` | Small RNA motif分析结果（miRBase比对、唯一reads、MEME de novo motifs）|
 
 ## 常见问题
 
@@ -275,7 +257,7 @@ rm -rf .snakemake/lock
 | 序列比对 | Bowtie2, SAMtools |
 | 基因计数 | featureCounts |
 | 差异表达 | DESeq2 (R) |
-| Motif 发现 | MEME Suite |
+| Motif 发现 | MEME Suite (de novo motif发现) |
 | 流程管理 | Snakemake |
 | 环境管理 | conda |
 

@@ -68,9 +68,7 @@ rule all:
 
         # Small RNA Motif分析
         os.path.join(config["directories"]["results"], "small_rna_motif", "mirna_reads.fasta"),
-        os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", "meme_summary.json"),
-        os.path.join(config["directories"]["results"], "small_rna_motif", "tomtom_results", "tomtom_summary.json"),
-        os.path.join(config["directories"]["results"], "small_rna_motif", "tomtom_results", "tomtom_comparisons.csv")
+        os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", "meme_summary.json")
 
 
 # ==================== 数据质量控制 ====================
@@ -325,22 +323,6 @@ rule meme_analysis:
         """
 
 
-rule tomtom_analysis:
-    """Step 3: 运行TomTom与已知motif数据库比对"""
-    input:
-        meme_xml=os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", "meme.xml")
-    output:
-        tomtom_summary=os.path.join(config["directories"]["results"], "small_rna_motif", "tomtom_results", "tomtom_summary.json"),
-        tomtom_comparisons=os.path.join(config["directories"]["results"], "small_rna_motif", "tomtom_results", "tomtom_comparisons.csv")
-    log:
-        os.path.join(LOG_DIR, "tomtom_analysis.log")
-    shell:
-        """
-        python scripts/motif/small_rna_motif.py \
-            --config config/config.yaml \
-            --step tomtom \
-            2>&1 | tee {log}
-        """
 
 
 # ==================== 辅助规则 ====================
@@ -356,7 +338,6 @@ rule create_directories:
         os.path.join(config["directories"]["results"], "differential_expression", ".dir_exists"),
         os.path.join(config["directories"]["results"], "small_rna_motif", ".dir_exists"),
         os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", ".dir_exists"),
-        os.path.join(config["directories"]["results"], "small_rna_motif", "tomtom_results", ".dir_exists")
     shell:
         """
         mkdir -p {config[directories][processed]} \
@@ -364,8 +345,7 @@ rule create_directories:
                  {config[directories][results]}/alignment \
                  {config[directories][results]}/counts \
                  {config[directories][results]}/differential_expression \
-                 {config[directories][results]}/small_rna_motif/meme_results \
-                 {config[directories][results]}/small_rna_motif/tomtom_results
+                 {config[directories][results]}/small_rna_motif/meme_results
         touch {output}
         """
 

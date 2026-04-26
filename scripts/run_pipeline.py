@@ -285,7 +285,6 @@ def get_available_modules() -> Dict[str, str]:
         'motif': '仅运行motif分析模块（完整流程）',
         'mirbase': '仅运行miRBase比对步骤',
         'meme': '仅运行MEME分析步骤',
-        'tomtom': '仅运行TomTom比对步骤',
     }
 
 
@@ -401,11 +400,10 @@ def main():
         'alignment': os.path.join(config['directories']['results'], 'alignment', 'alignment_summary.csv'),
         'counts': os.path.join(config['directories']['results'], 'counts', 'counts_summary.csv'),
         'de': os.path.join(config['directories']['results'], 'differential_expression', 'deseq2_results.csv'),
-        'motif': os.path.join(config['directories']['results'], 'small_rna_motif', 'tomtom_results', 'tomtom_summary.json'),
+        'motif': os.path.join(config['directories']['results'], 'small_rna_motif', 'meme_results', 'meme_summary.json'),
         # motif子步骤
         'mirbase': os.path.join(config['directories']['results'], 'small_rna_motif', 'mirna_reads.fasta'),
         'meme': os.path.join(config['directories']['results'], 'small_rna_motif', 'meme_results', 'meme_summary.json'),
-        'tomtom': os.path.join(config['directories']['results'], 'small_rna_motif', 'tomtom_results', 'tomtom_summary.json'),
     }
 
     target = target_map.get(args.module) if args.module and args.module != 'all' else None

@@ -96,14 +96,6 @@ motif_analysis:
     maxsites: 100
     searchsize: 100000
     threads: 8
-  tomtom:
-    enabled: true
-    database: null  # null表示自动下载JASPAR数据库
-    evalue_threshold: 0.05
-    min_overlap: 5
-    # 自动下载源（仅在database为null时使用）
-    # 推荐手动下载大文件以加快部署速度
-    download_url: "https://jaspar.elixir.no/download/data/2026/CORE/JASPAR2026_CORE_vertebrates_non-redundant_pfms_meme.txt"
   filtering:
     evalue_threshold: 1e-4
     min_sites: 10
