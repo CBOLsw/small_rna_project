@@ -150,6 +150,7 @@ openspec/changes/archive/
 # Data files (should not be committed)
 data/*
 !data/.gitkeep
+!data/metadata/
 !data/metadata/.gitkeep
 !data/metadata/sample_info.csv
 !data/raw_fastq/.gitkeep
