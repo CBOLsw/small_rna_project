@@ -435,6 +435,211 @@ def deduplicate_motifs(motifs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return unique_motifs
 
 
+def check_tomtom_installed(tomtom_path: str = "tomtom") -> bool:
+    """检查TomTom是否安装"""
+    try:
+        result = subprocess.run(
+            [tomtom_path, '-version'],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        return result.returncode == 0
+    except FileNotFoundError:
+        return False
+
+
+def ensure_motif_database(database: Optional[str] = None) -> Optional[str]:
+    """确保motif数据库可用，优先使用本地JASPAR数据库"""
+    # 检查项目本地路径
+    local_db = Path("references/motif_databases/JASPAR/JASPAR2024_CORE_vertebrates_non-redundant.meme")
+    if local_db.exists():
+        logger.info(f"使用本地数据库: {local_db}")
+        return str(local_db)
+
+    old_db = Path("references/motif_databases/JASPAR/JASPAR2022_CORE_vertebrates_non-redundant.meme")
+    if old_db.exists():
+        logger.info(f"使用本地数据库: {old_db}")
+        return str(old_db)
+
+    # 检查MEME默认安装路径
+    for prefix in ["/usr/local", "/usr", os.path.expanduser("~/miniconda3/envs/small_rna_analysis")]:
+        for db_path in [
+            f"{prefix}/share/meme/db/motif_databases/JASPAR/JASPAR2024_CORE_vertebrates_non-redundant.meme",
+            f"{prefix}/share/meme/db/motif_databases/JASPAR/JASPAR2022_CORE_vertebrates_non-redundant.meme",
+        ]:
+            if Path(db_path).exists():
+                logger.info(f"使用系统数据库: {db_path}")
+                return db_path
+
+    # 检查用户指定的数据库
+    if database and Path(database).exists():
+        return database
+
+    logger.warning("未找到JASPAR数据库，TomTom分析将跳过")
+    return None
+
+
+def run_tomtom_analysis(motif_file: str, output_dir: str,
+                       database: str = None,
+                       evalue_threshold: float = 0.05,
+                       min_overlap: int = 5) -> Dict[str, Any]:
+    """运行TomTom motif比较分析"""
+    # 检查输入文件
+    if not Path(motif_file).exists():
+        logger.error(f"输入文件不存在: {motif_file}")
+        return {'success': False, 'error': '输入文件不存在'}
+
+    # 检查TomTom是否安装
+    if not check_tomtom_installed():
+        logger.error("TomTom未安装或不在PATH中，跳过TomTom分析")
+        return {'success': False, 'error': 'TomTom未安装'}
+
+    # 创建输出目录
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # 确保数据库可用
+    database = ensure_motif_database(database)
+    if database is None:
+        logger.warning("未找到motif数据库，TomTom分析跳过")
+        return {'success': False, 'error': 'motif数据库未找到'}
+
+    logger.info(f"开始TomTom motif比较分析")
+    logger.info(f"输入motif文件: {motif_file}")
+    logger.info(f"数据库: {database}")
+
+    try:
+        # 构建TomTom命令
+        cmd = [
+            'tomtom',
+            '-o', str(output_path),
+            '-evalue', str(evalue_threshold),
+            '-min-overlap', str(min_overlap),
+            '-text',  # 输出文本格式便于解析
+            motif_file,
+            database
+        ]
+
+        logger.info(f"运行TomTom: {' '.join(cmd)}")
+
+        # 执行TomTom命令
+        process = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=300
+        )
+
+        logger.info("TomTom分析完成")
+
+        # 解析主要结果
+        txt_file = output_path / 'tomtom.txt'
+        comparisons = parse_tomtom_result(txt_file) if txt_file.exists() else []
+
+        result = {
+            'success': True,
+            'output_dir': str(output_path),
+            'comparisons_found': len(comparisons),
+            'comparisons': comparisons,
+            'parameters': {
+                'database': database,
+                'evalue_threshold': evalue_threshold,
+                'min_overlap': min_overlap
+            }
+        }
+
+        # 保存结果摘要
+        save_tomtom_summary(result, output_path)
+
+        logger.info(f"发现 {len(comparisons)} 个显著motif比对")
+        return result
+
+    except subprocess.TimeoutExpired:
+        logger.error("TomTom运行超时(5分钟)")
+        return {'success': False, 'error': 'TomTom运行超时'}
+    except subprocess.CalledProcessError as e:
+        logger.error(f"TomTom执行失败: {e.stderr[:300] if e.stderr else ''}")
+        return {'success': False, 'error': f'TomTom执行失败'}
+    except Exception as e:
+        logger.error(f"运行TomTom时出错: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+def parse_tomtom_result(txt_file: Path) -> List[Dict[str, Any]]:
+    """解析TomTom文本格式结果"""
+    comparisons = []
+
+    if not txt_file.exists():
+        return comparisons
+
+    try:
+        with open(txt_file, 'r') as f:
+            lines = f.readlines()
+
+        # 查找标题行
+        header_found = False
+        headers = []
+        for line in lines:
+            line = line.strip()
+
+            if not line:
+                continue
+
+            if line.startswith('#Query_ID'):
+                header_found = True
+                headers = line[1:].split('\t')
+                continue
+
+            if header_found and line and not line.startswith('#'):
+                parts = line.split('\t')
+                if len(parts) >= len(headers):
+                    comparison = {}
+                    for i, header in enumerate(headers):
+                        if i < len(parts):
+                            value = parts[i].strip()
+                            # 转换数值类型
+                            if header in ['E-value', 'q-value', 'Overlap', 'Offset']:
+                                try:
+                                    if value == 'N/A' or value == '':
+                                        value = None
+                                    else:
+                                        value = float(value)
+                                except:
+                                    value = None
+                            comparison[header] = value
+                    comparisons.append(comparison)
+
+    except Exception as e:
+        logger.warning(f"解析TomTom结果时出错: {e}")
+
+    return comparisons
+
+
+def save_tomtom_summary(result: Dict[str, Any], output_dir: Path):
+    """保存TomTom结果摘要"""
+    # JSON摘要
+    summary_file = output_dir / "tomtom_summary.json"
+    with open(summary_file, 'w') as f:
+        json.dump(result, f, indent=2)
+
+    # CSV表格
+    if result.get('comparisons'):
+        df = pd.DataFrame(result['comparisons'])
+        csv_file = output_dir / "tomtom_comparisons.csv"
+        df.to_csv(csv_file, index=False)
+
+        # 创建简化的Top N结果
+        top_n = 20
+        if len(df) > 0 and 'E-value' in df.columns:
+            df_sorted = df.sort_values('E-value')
+            top_file = output_dir / f"tomtom_top{top_n}.csv"
+            df_sorted.head(top_n).to_csv(top_file, index=False)
+
+    logger.info(f"TomTom结果摘要已保存: {summary_file}")
+
+
 def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
     """运行完整的small RNA motif分析流程"""
     motif_cfg = config.get('motif_analysis', {})
@@ -534,6 +739,24 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
         }
         with open(meme_summary_file, 'w') as f:
             json.dump(meme_summary_data, f, indent=2)
+
+    # Step 7: 运行TomTom与已知motif数据库比对
+    tomtom_cfg = motif_cfg.get('tomtom', {})
+    if tomtom_cfg.get('enabled', True) and meme_result.get('success', False):
+        tomtom_result = run_tomtom_analysis(
+            motif_file=str(motif_results_dir / 'meme_results' / 'meme.xml'),
+            output_dir=str(motif_results_dir / 'tomtom_results'),
+            database=tomtom_cfg.get('database', None),
+            evalue_threshold=tomtom_cfg.get('evalue_threshold', 0.05),
+            min_overlap=tomtom_cfg.get('min_overlap', 5)
+        )
+        summary['tomtom_result'] = tomtom_result
+
+        # 保存TomTom摘要JSON
+        if tomtom_result.get('success', False):
+            tomtom_summary_file = motif_results_dir / 'tomtom_results' / 'tomtom_summary.json'
+            with open(tomtom_summary_file, 'w') as f:
+                json.dump(tomtom_result, f, indent=2)
 
     logger.info(f"=== Small RNA Motif分析完成 ===")
     logger.info(f"总样本数: {len(samples)}")
