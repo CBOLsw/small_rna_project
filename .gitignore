@@ -148,16 +148,14 @@ cython_debug/
 openspec/changes/archive/
 
 # Data files (should not be committed)
-data/*
-!data/.gitkeep
+data/
 !data/metadata/
-!data/metadata/.gitkeep
 !data/metadata/sample_info.csv
-!data/raw_fastq/.gitkeep
-!data/processed/.gitkeep
-results/*
-!results/.gitkeep
-!results/qc/.gitkeep
+
+# results/ logs/ references/ 整体忽略
+results/
+logs/
+references/
 !results/alignment/.gitkeep
 !results/counts/.gitkeep
 !results/differential_expression/.gitkeep
