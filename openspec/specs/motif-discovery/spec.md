@@ -36,10 +36,6 @@ TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update 
 - **WHEN** 发现潜在motif
 - **THEN** 系统使用背景序列验证motif特异性，计算motif在背景序列中的出现频率
 
-#### Scenario: TomTom motif比较
-- **WHEN** 发现新的motif
-- **THEN** 系统使用TomTom与已知motif数据库（如JASPAR、CIS-BP）比较，识别相似motif
-
 ### Requirement: motif结果可视化和解释
 系统应生成motif分析的可视化图表和结果报告。
 
