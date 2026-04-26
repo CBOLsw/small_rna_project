@@ -69,7 +69,9 @@ rule all:
         # Small RNA Motif分析
         os.path.join(config["directories"]["results"], "small_rna_motif", "small_rna_motif_summary.json"),
         os.path.join(config["directories"]["results"], "small_rna_motif", "mirna_reads.fasta"),
-        os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", "meme_summary.json")
+        os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", "meme_summary.json"),
+        os.path.join(config["directories"]["results"], "small_rna_motif", "tomtom_results", "tomtom_summary.json"),
+        os.path.join(config["directories"]["results"], "small_rna_motif", "tomtom_results", "tomtom_comparisons.csv")
 
 
 # ==================== 数据质量控制 ====================
@@ -286,14 +288,16 @@ rule deseq2_analysis:
 # ==================== Small RNA Motif分析 ====================
 
 rule small_rna_motif:
-    """Small RNA motif分析：比对到miRBase -> 提取reads -> MEME motif发现"""
+    """Small RNA motif分析：比对到miRBase -> 提取reads -> MEME motif发现 -> TomTom比对"""
     input:
         # 需要先完成trimming
         expand(os.path.join(config["directories"]["processed"], "{sample}_trimmed.fastq.gz"), sample=[s[0] for s in SAMPLES])
     output:
         summary=os.path.join(config["directories"]["results"], "small_rna_motif", "small_rna_motif_summary.json"),
         fasta=os.path.join(config["directories"]["results"], "small_rna_motif", "mirna_reads.fasta"),
-        meme_summary=os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", "meme_summary.json")
+        meme_summary=os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", "meme_summary.json"),
+        tomtom_summary=os.path.join(config["directories"]["results"], "small_rna_motif", "tomtom_results", "tomtom_summary.json"),
+        tomtom_comparisons=os.path.join(config["directories"]["results"], "small_rna_motif", "tomtom_results", "tomtom_comparisons.csv")
     log:
         os.path.join(LOG_DIR, "small_rna_motif.log")
     threads: config["motif_analysis"]["meme"]["threads"]
@@ -317,7 +321,8 @@ rule create_directories:
         os.path.join(config["directories"]["results"], "counts", ".dir_exists"),
         os.path.join(config["directories"]["results"], "differential_expression", ".dir_exists"),
         os.path.join(config["directories"]["results"], "small_rna_motif", ".dir_exists"),
-        os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", ".dir_exists")
+        os.path.join(config["directories"]["results"], "small_rna_motif", "meme_results", ".dir_exists"),
+        os.path.join(config["directories"]["results"], "small_rna_motif", "tomtom_results", ".dir_exists")
     shell:
         """
         mkdir -p {config[directories][processed]} \
@@ -325,7 +330,8 @@ rule create_directories:
                  {config[directories][results]}/alignment \
                  {config[directories][results]}/counts \
                  {config[directories][results]}/differential_expression \
-                 {config[directories][results]}/small_rna_motif/meme_results
+                 {config[directories][results]}/small_rna_motif/meme_results \
+                 {config[directories][results]}/small_rna_motif/tomtom_results
         touch {output}
         """
 
