@@ -1,5 +1,8 @@
-## ADDED Requirements
+# data-quality-control Specification
 
+## Purpose
+TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update Purpose after archive.
+## Requirements
 ### Requirement: 原始数据质量评估
 系统应对small RNA测序原始数据进行全面的质量评估，包括测序质量分布、GC含量、序列长度分布、接头污染检测等指标。
 
@@ -36,3 +39,4 @@
 #### Scenario: 质控可视化
 - **WHEN** 质控完成
 - **THEN** 系统生成质控可视化图表，包括所有样本的reads数条形图、质量分数分布热图、长度分布小提琴图
+

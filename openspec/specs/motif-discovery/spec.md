@@ -1,5 +1,8 @@
-## ADDED Requirements
+# motif-discovery Specification
 
+## Purpose
+TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update Purpose after archive.
+## Requirements
 ### Requirement: 差异表达基因序列提取
 系统应从差异表达分析结果中提取small RNA序列信息。
 
@@ -55,3 +58,4 @@
 #### Scenario: 结果表格导出
 - **WHEN** motif分析完成
 - **THEN** 系统导出motif结果表格，包含motif ID、序列模式、宽度、E-value、在靶序列中的出现次数等信息
+

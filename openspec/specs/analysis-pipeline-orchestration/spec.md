@@ -1,5 +1,8 @@
-## ADDED Requirements
+# analysis-pipeline-orchestration Specification
 
+## Purpose
+TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update Purpose after archive.
+## Requirements
 ### Requirement: 模块化分析流程设计
 系统应设计模块化的分析流程，每个分析步骤独立可复用。
 
@@ -66,3 +69,4 @@
 #### Scenario: 可重复性文档
 - **WHEN** 分析完成
 - **THEN** 系统生成可重复性文档，记录软件版本、参数设置、执行命令，确保结果可重现
+

@@ -1,5 +1,8 @@
-## ADDED Requirements
+# differential-expression-analysis Specification
 
+## Purpose
+TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update Purpose after archive.
+## Requirements
 ### Requirement: 基因计数矩阵生成
 系统应基于比对结果生成基因表达计数矩阵。
 
@@ -59,3 +62,4 @@
 #### Scenario: 结果表格导出
 - **WHEN** 差异分析完成
 - **THEN** 系统导出完整结果表格，包含基因ID、基因名称、基础表达量、log2FC、p-value、adjusted p-value、基因类型等信息
+

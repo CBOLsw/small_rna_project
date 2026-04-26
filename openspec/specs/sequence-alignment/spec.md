@@ -1,5 +1,8 @@
-## ADDED Requirements
+# sequence-alignment Specification
 
+## Purpose
+TBD - created by archiving change small-rna-seq-analysis-gao-pal-groups. Update Purpose after archive.
+## Requirements
 ### Requirement: 参考基因组索引构建
 系统应构建参考基因组的比对索引，支持Bowtie2比对工具。
 
@@ -51,3 +54,4 @@
 #### Scenario: 基因组覆盖度分析
 - **WHEN** 比对完成
 - **THEN** 系统分析reads在基因组上的覆盖度，生成覆盖深度分布图，识别覆盖偏好性
+
