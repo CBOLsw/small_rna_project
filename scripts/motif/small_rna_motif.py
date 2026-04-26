@@ -623,13 +623,19 @@ def run_tomtom_analysis(motif_file: str, output_dir: str,
 
     # 创建输出目录
     output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
 
     # 确保数据库可用
     database = ensure_motif_database(database)
     if database is None:
         logger.warning("未找到motif数据库，TomTom分析跳过")
         return {'success': False, 'error': 'motif数据库未找到'}
+
+    # TomTom不会覆盖已有目录，需要先删除
+    if output_path.exists():
+        import shutil
+        shutil.rmtree(output_path)
+        logger.info(f"已删除旧输出目录: {output_path}")
+    output_path.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"开始TomTom motif比较分析")
     logger.info(f"输入motif文件: {motif_file}")
