@@ -808,10 +808,8 @@ def run_small_rna_motif_analysis(config: Dict[str, Any]) -> Dict[str, Any]:
     meme_result = {'success': False}
     meme_xml_file = motif_results_dir / 'meme_results' / 'meme.xml'
 
-    # 检查点：MEME结果已存在，跳过miRBase比对和MEME
-    meme_skipped = meme_summary_file.exists() and combined_fasta.exists() and meme_xml_file.exists()
-
-    if meme_skipped:
+    # 检查点：MEME结果已存在（只需检查meme.xml），跳过miRBase比对和MEME
+    if meme_xml_file.exists():
         logger.info("检测到MEME结果已存在，跳过miRBase比对和MEME，直接运行TomTom")
     else:
         # Step 1: 确保miRBase序列存在
