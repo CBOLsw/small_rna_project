@@ -33,7 +33,8 @@ small_rna_project/
 │   ├── expression/        # 表达分析脚本
 │   ├── motif/            # Motif分析脚本
 │   ├── utils/            # 工具脚本
-│   └── run_pipeline.py   # 流程执行入口
+│   ├── run_pipeline.py   # 流程执行入口
+│   └── results_integration.py  # 结果整合脚本（生成HTML综合报告）
 ├── workflow/              # Snakemake 流程定义
 ├── envs/                  # Conda 环境配置
 │   └── small_rna_analysis.yaml  # 环境依赖文件
@@ -114,6 +115,9 @@ python scripts/run_pipeline.py --config config/config.yaml --status
 
 # 从失败处恢复
 python scripts/run_pipeline.py --config config/config.yaml --resume --cores 8
+
+# 生成综合报告（分析完成后运行）
+python scripts/results_integration.py --config config/config.yaml
 ```
 
 ## 参考基因组说明
@@ -221,6 +225,7 @@ motif_analysis:
 | `counts/` | 基因表达矩阵 (gene_counts.csv) |
 | `differential_expression/` | DEGs列表、火山图、热图 |
 | `small_rna_motif/` | Small RNA motif分析结果（miRBase比对、唯一reads、MEME de novo motifs）|
+| `summary/` | 综合HTML报告 (comprehensive_report.html) |
 
 ## 常见问题
 
@@ -233,13 +238,7 @@ rm -rf .snakemake/lock
 ### 2. 参考基因组下载慢
 建议手动下载 `.gz` 文件放到 `references/` 目录，脚本会自动跳过下载直接解压。
 
-### 3. Snakemake 锁定
-如果流程中断后无法重启：
-```bash
-rm -rf .snakemake/lock
-```
-
-### 4. 内存不足
+### 3. 内存不足
 减少 `--cores` 参数，或在 `config.yaml` 中减小线程数。
 
 ## 系统要求

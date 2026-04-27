@@ -51,28 +51,42 @@ def load_config(config_file: str) -> Dict[str, Any]:
         sys.exit(1)
 
 
-def collect_qc_results(config: Dict[str, Any]) -> pd.DataFrame:
-    """收集质量控制结果"""
+def collect_qc_results(config: Dict[str, Any], report_relative: bool = False) -> pd.DataFrame:
+    """收集质量控制结果
+
+    Args:
+        config: 配置字典
+        report_relative: 是否返回相对于报告目录的路径
+    """
     logger = logging.getLogger(__name__)
     qc_dir = os.path.join(config['directories']['results'], 'qc')
 
     qc_results = []
 
     # 查找所有 fastqc 结果
-    for file in Path(qc_dir).glob('*.html'):
-        if '_fastqc.html' in str(file):
-            sample = str(file.name).replace('_fastqc.html', '')
-            qc_results.append({
-                'sample': sample,
-                'fastqc_html': str(file),
-                'status': 'completed'
-            })
+    for file in sorted(Path(qc_dir).glob('*_fastqc.html')):
+        sample = file.name.replace('_fastqc.html', '')
+        # 确定路径：报告在 results/summary/，QC结果在 results/qc/
+        if report_relative:
+            html_path = f"../qc/{file.name}"
+        else:
+            html_path = str(file)
+        qc_results.append({
+            'sample': sample,
+            'fastqc_html': html_path,
+            'status': 'completed'
+        })
 
-    # 加载 qc_summary.csv
+    # 加载 qc_summary.csv（如果存在且更完整）
     summary_file = os.path.join(qc_dir, 'qc_summary.csv')
     if os.path.exists(summary_file):
         try:
             qc_summary = pd.read_csv(summary_file)
+            # 更新 html_report 路径为相对路径
+            if report_relative:
+                qc_summary['html_report'] = qc_summary['html_report'].apply(
+                    lambda x: '../' + x if not x.startswith('../') else x
+                )
             logger.info(f"质量控制结果已收集: {len(qc_summary)} 个样本")
             return qc_summary
         except Exception as e:
@@ -86,19 +100,6 @@ def collect_alignment_results(config: Dict[str, Any]) -> pd.DataFrame:
     logger = logging.getLogger(__name__)
     alignment_dir = os.path.join(config['directories']['results'], 'alignment')
 
-    alignment_files = []
-
-    # 查找所有比对统计文件
-    for file in Path(alignment_dir).glob('*_alignment_stats.csv'):
-        if '_alignment_stats.csv' in str(file):
-            sample = str(file.name).replace('_alignment_stats.csv', '')
-            alignment_files.append({
-                'sample': sample,
-                'stats_file': str(file),
-                'bam_file': os.path.join(alignment_dir, f"{sample}.sorted.bam"),
-                'bai_file': os.path.join(alignment_dir, f"{sample}.sorted.bam.bai")
-            })
-
     # 加载 alignment_summary.csv
     summary_file = os.path.join(alignment_dir, 'alignment_summary.csv')
     if os.path.exists(summary_file):
@@ -109,7 +110,7 @@ def collect_alignment_results(config: Dict[str, Any]) -> pd.DataFrame:
         except Exception as e:
             logger.warning(f"无法读取比对摘要: {e}")
 
-    return pd.DataFrame(alignment_files)
+    return pd.DataFrame()
 
 
 def collect_expression_results(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -213,6 +214,19 @@ def generate_html_report(config: Dict[str, Any],
                         expression_data: Dict[str, Any],
                         motif_data: Dict[str, Any]) -> str:
     """生成HTML报告内容"""
+    # 项目名称，默认为 small_rna_analysis
+    project_name = config.get('project_name', 'small_rna_analysis')
+
+    # 获取基因数量和差异基因数量
+    gene_counts = 0
+    if 'gene_counts' in expression_data and hasattr(expression_data['gene_counts'], '__len__'):
+        gene_counts = len(expression_data['gene_counts'])
+    filtered_degs_count = 0
+    if 'filtered_degs' in expression_data and hasattr(expression_data['filtered_degs'], '__len__'):
+        filtered_degs_count = len(expression_data['filtered_degs'])
+
+    motif_count = len(motif_data.get('filtered_motifs', []))
+
     # 简单的HTML模板
     html = f"""
     <!DOCTYPE html>
@@ -220,7 +234,7 @@ def generate_html_report(config: Dict[str, Any],
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Small RNA测序分析报告 - {config['project_name']}</title>
+        <title>Small RNA测序分析报告 - {project_name}</title>
         <style>
             body {{
                 font-family: Arial, sans-serif;
@@ -326,7 +340,7 @@ def generate_html_report(config: Dict[str, Any],
         <div class="container">
             <h1>Small RNA测序分析报告</h1>
             <p style="text-align: center; color: #666;">
-                项目: {config['project_name']} |
+                项目: {project_name} |
                 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             </p>
 
@@ -339,21 +353,15 @@ def generate_html_report(config: Dict[str, Any],
                         <div class="stat-label">样本数量</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value">
-                            {len(expression_data.get('gene_counts', [])) if 'gene_counts' in expression_data else 0}
-                        </div>
+                        <div class="stat-value">{gene_counts}</div>
                         <div class="stat-label">基因数量</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value">
-                            {len(expression_data.get('filtered_degs', [])) if 'filtered_degs' in expression_data else 0}
-                        </div>
+                        <div class="stat-value">{filtered_degs_count}</div>
                         <div class="stat-label">差异基因</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value">
-                            {len(motif_data.get('filtered_motifs', [])) if 'filtered_motifs' in motif_data else 0}
-                        </div>
+                        <div class="stat-value">{motif_count}</div>
                         <div class="stat-label">Motif数量</div>
                     </div>
                 </div>
@@ -372,11 +380,13 @@ def generate_html_report(config: Dict[str, Any],
 
     for _, row in qc_data.head(10).iterrows():  # 只显示前10个样本
         sample = row.get('sample', str(row.get('sample_name', '未知')))
+        # 兼容不同的列名
+        fastqc_link = row.get('fastqc_html_report', row.get('fastqc_html', '#'))
         html += f"""
                     <tr>
                         <td>{sample}</td>
                         <td><span class="status completed">完成</span></td>
-                        <td><a href="{row.get('fastqc_html', '#')}" class="file-link" target="_blank">FastQC报告</a></td>
+                        <td><a href="{fastqc_link}" class="file-link" target="_blank">FastQC报告</a></td>
                     </tr>
         """
 
@@ -394,23 +404,26 @@ def generate_html_report(config: Dict[str, Any],
                     <tr>
                         <th>样本</th>
                         <th>比对率</th>
-                        <th>唯一比对</th>
-                        <th>多重比对</th>
+                        <th>已比对reads</th>
+                        <th>总reads数</th>
                     </tr>
     """
 
     for _, row in alignment_data.head(10).iterrows():  # 只显示前10个样本
         sample = row.get('sample', '未知')
         mapping_rate = row.get('mapping_rate', 'N/A')
-        unique_mapping = row.get('unique_mapping', 'N/A')
-        multiple_mapping = row.get('multiple_mapping', 'N/A')
+        # 将小数转换为百分比显示
+        if isinstance(mapping_rate, (int, float)):
+            mapping_rate = f"{mapping_rate * 100:.2f}%"
+        total_reads = row.get('total_reads', 'N/A')
+        mapped_reads = row.get('mapped_reads', 'N/A')
 
         html += f"""
                     <tr>
                         <td>{sample}</td>
                         <td>{mapping_rate}</td>
-                        <td>{unique_mapping}</td>
-                        <td>{multiple_mapping}</td>
+                        <td>{mapped_reads:,}</td>
+                        <td>{total_reads:,}</td>
                     </tr>
         """
 
@@ -427,48 +440,32 @@ def generate_html_report(config: Dict[str, Any],
                 <div class="visualization">
     """
 
-    de_dir = os.path.join(config['directories']['results'], 'differential_expression')
-    volcano_plot = os.path.join(de_dir, 'volcano_plot.png')
-    if os.path.exists(volcano_plot):
-        html += f"<img src='{volcano_plot}' alt='火山图'>"
+    # 使用相对路径：报告在 results/summary/，图片在 results/differential_expression/
+    volcano_plot_path = '../differential_expression/volcano_plot.png'
+    heatmap_path = '../differential_expression/heatmap.png'
 
-    heatmap = os.path.join(de_dir, 'heatmap.png')
-    if os.path.exists(heatmap):
-        html += f"<img src='{heatmap}' alt='热图'>"
+    if os.path.exists(os.path.join(config['directories']['results'], 'differential_expression', 'volcano_plot.png')):
+        html += f"<img src='{volcano_plot_path}' alt='火山图'>"
 
-    html += """
+    if os.path.exists(os.path.join(config['directories']['results'], 'differential_expression', 'heatmap.png')):
+        html += f"<img src='{heatmap_path}' alt='热图'>"
+
+    html += f"""
                 </div>
-                <p>差异表达基因数量:
-                <strong>
-    """
-
-    html += f"{len(expression_data.get('filtered_degs', [])) if 'filtered_degs' in expression_data else 0}"
-
-    html += """
-                </strong>
-                </p>
+                <p>差异表达基因数量: <strong>{filtered_degs_count}</strong></p>
             </div>
 
             <!-- Motif分析 -->
             <div class="section">
                 <h2>Motif分析</h2>
-                <p>发现的motif数量:
-                <strong>
-    """
-
-    html += f"{len(motif_data.get('filtered_motifs', [])) if 'filtered_motifs' in motif_data else 0}"
-
-    html += """
-                </strong>
-                </p>
+                <p>发现的motif数量: <strong>{motif_count}</strong></p>
 
                 <div class="visualization">
     """
 
-    motif_dir = os.path.join(config['directories']['results'], 'small_rna_motif')
-    meme_html = os.path.join(motif_dir, 'meme_results', 'meme.html')
-    if os.path.exists(meme_html):
-        html += f"<p>MEME结果: <a href='{meme_html}' target='_blank'>meme.html</a></p>"
+    meme_html_path = '../small_rna_motif/meme_results/meme.html'
+    if os.path.exists(os.path.join(config['directories']['results'], 'small_rna_motif', 'meme_results', 'meme.html')):
+        html += f"<p>MEME结果: <a href='{meme_html_path}' target='_blank'>meme.html</a></p>"
 
     html += """
                 </div>
@@ -479,9 +476,8 @@ def generate_html_report(config: Dict[str, Any],
                 <h2>报告信息</h2>
                 <table>
                     <tr>
-                        <th>项目</th>
-                        <td><a href="https://github.com/your-repo" target="_blank">
-                        small_rna_analysis_gao_pal</a></td>
+                        <th>项目名称</th>
+                        <td>""" + project_name + """</td>
                     </tr>
                     <tr>
                         <th>分析流程</th>
@@ -603,7 +599,7 @@ def main():
     # 收集各模块结果
     logger.info("开始收集分析结果...")
 
-    qc_data = collect_qc_results(config)
+    qc_data = collect_qc_results(config, report_relative=True)
     alignment_data = collect_alignment_results(config)
     expression_data = collect_expression_results(config)
     motif_data = collect_motif_results(config)
